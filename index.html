@@ -32,6 +32,9 @@
   --shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08);
   --shadow-lg: 0 4px 12px rgba(0,0,0,0.15);
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --tag-active-bg: #e3f2fd;
+  --video-tag-bg: #e8f5e9;
+  --area-badge-active-bg: #e8f5e9;
   /* Area colors */
   --area-0: #1565c0;
   --area-1: #2e7d32;
@@ -49,7 +52,11 @@
 [data-theme="dark"] {
   --primary: #5c6bc0;
   --primary-light: #7986cb;
+<<<<<<< Updated upstream
   --accent: #ffb300;
+=======
+  --accent: #ffd54f;
+>>>>>>> Stashed changes
   --bg: #121212;
   --surface: #1e1e1e;
   --text: #e0e0e0;
@@ -57,6 +64,7 @@
   --success: #66bb6a;
   --danger: #ef5350;
   --border: #333333;
+<<<<<<< Updated upstream
   --weekend: #1b2e1c;
   --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
   --shadow-lg: 0 4px 12px rgba(0,0,0,0.5);
@@ -74,6 +82,15 @@
   --area-6: #7e57c2;
 }
 html { color-scheme: light dark; }
+=======
+  --weekend: #1b3d20;
+  --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,0.5);
+  --tag-active-bg: #1a3a5c;
+  --video-tag-bg: #1b3d20;
+  --area-badge-active-bg: #1b3d20;
+}
+>>>>>>> Stashed changes
 body {
   font-family: var(--font);
   background: var(--bg);
@@ -128,9 +145,12 @@ input, select, textarea { font-family: var(--font); font-size: 14px; }
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   scroll-snap-type: x mandatory;
+<<<<<<< Updated upstream
   position: sticky;
   top: 46px;
   z-index: 90;
+=======
+>>>>>>> Stashed changes
 }
 .tab-nav::-webkit-scrollbar { display: none; }
 .tab-btn {
@@ -147,6 +167,7 @@ input, select, textarea { font-family: var(--font); font-size: 14px; }
   border-bottom: 3px solid transparent;
   transition: all 0.2s;
   white-space: nowrap;
+  scroll-snap-align: start;
 }
 .tab-btn.active {
   color: var(--primary);
@@ -197,7 +218,11 @@ input, select, textarea { font-family: var(--font); font-size: 14px; }
 }
 .btn-primary { background: var(--primary); color: white; }
 .btn-primary:hover { background: var(--primary-light); }
+<<<<<<< Updated upstream
 .btn-accent { background: var(--accent); color: #1a1a1a; }
+=======
+.btn-accent { background: var(--accent); color: var(--text); }
+>>>>>>> Stashed changes
 .btn-accent:hover { opacity: 0.9; }
 .btn-danger { background: var(--danger); color: white; }
 .btn-danger:hover { opacity: 0.9; }
@@ -219,7 +244,11 @@ input, select, textarea { font-family: var(--font); font-size: 14px; }
   height: 56px;
   border-radius: 50%;
   background: var(--accent);
+<<<<<<< Updated upstream
   color: #1a1a1a;
+=======
+  color: var(--text);
+>>>>>>> Stashed changes
   border: none;
   font-size: 28px;
   box-shadow: var(--shadow-lg);
@@ -249,7 +278,11 @@ input, select, textarea { font-family: var(--font); font-size: 14px; }
   border-radius: var(--radius-sm);
   font-size: 14px;
   transition: border-color 0.2s;
+<<<<<<< Updated upstream
   background: var(--input-bg);
+=======
+  background: var(--surface);
+>>>>>>> Stashed changes
   color: var(--text);
 }
 .form-control:focus {
@@ -288,7 +321,7 @@ textarea.form-control { resize: vertical; min-height: 60px; }
   justify-content: space-between;
   align-items: center;
 }
-.modal-header h3 { font-size: 16px; }
+.modal-header h3 { font-size: 16px; color: var(--text); }
 .modal-close {
   background: none;
   border: none;
@@ -320,7 +353,11 @@ textarea.form-control { resize: vertical; min-height: 60px; }
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   font-size: 13px;
+<<<<<<< Updated upstream
   background: var(--input-bg);
+=======
+  background: var(--surface);
+>>>>>>> Stashed changes
   color: var(--text);
 }
 .segmented {
@@ -332,7 +369,11 @@ textarea.form-control { resize: vertical; min-height: 60px; }
 .segmented button {
   padding: 6px 14px;
   border: none;
+<<<<<<< Updated upstream
   background: var(--input-bg);
+=======
+  background: var(--surface);
+>>>>>>> Stashed changes
   font-size: 13px;
   color: var(--text-secondary);
   border-right: 1px solid var(--border);
@@ -351,7 +392,7 @@ textarea.form-control { resize: vertical; min-height: 60px; }
   gap: 16px;
   margin-bottom: 16px;
 }
-.month-nav h2 { font-size: 18px; min-width: 180px; text-align: center; }
+.month-nav h2 { font-size: 18px; min-width: 180px; text-align: center; color: var(--text); }
 .month-nav button {
   background: none;
   border: 1px solid var(--border);
@@ -400,7 +441,11 @@ textarea.form-control { resize: vertical; min-height: 60px; }
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   font-size: 13px;
+<<<<<<< Updated upstream
   background: var(--input-bg);
+=======
+  background: var(--surface);
+>>>>>>> Stashed changes
   color: var(--text);
 }
 
@@ -415,7 +460,7 @@ textarea.form-control { resize: vertical; min-height: 60px; }
   justify-content: space-between;
   align-items: flex-start;
 }
-.vol-info h4 { font-size: 14px; margin-bottom: 2px; }
+.vol-info h4 { font-size: 14px; margin-bottom: 2px; color: var(--text); }
 .vol-info p { font-size: 12px; color: var(--text-secondary); }
 .vol-tags { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
 .tag {
@@ -426,7 +471,11 @@ textarea.form-control { resize: vertical; min-height: 60px; }
   color: var(--text-secondary);
   font-weight: 500;
 }
+<<<<<<< Updated upstream
 .tag.active-tag { background: var(--tag-bg); color: var(--primary); border: 1px solid var(--primary); }
+=======
+.tag.active-tag { background: var(--tag-active-bg); color: var(--area-0); }
+>>>>>>> Stashed changes
 
 /* ===== DISPONIBILIDADE MODULE ===== */
 .avail-grid {
@@ -479,7 +528,7 @@ textarea.form-control { resize: vertical; min-height: 60px; }
   background: var(--bg);
   cursor: pointer;
 }
-.avail-member-header h4 { font-size: 14px; }
+.avail-member-header h4 { font-size: 14px; color: var(--text); }
 .avail-member-body { padding: 8px; }
 
 /* ===== RETENCAO MODULE ===== */
@@ -569,7 +618,7 @@ textarea.form-control { resize: vertical; min-height: 60px; }
   padding: 12px 16px;
   margin-bottom: 8px;
 }
-.retencao-card h4 { font-size: 14px; margin-bottom: 4px; }
+.retencao-card h4 { font-size: 14px; margin-bottom: 4px; color: var(--text); }
 .retencao-card .section-title {
   font-size: 11px;
   font-weight: 600;
@@ -605,7 +654,7 @@ textarea.form-control { resize: vertical; min-height: 60px; }
   border-radius: 50%;
   flex-shrink: 0;
 }
-.config-area-name { flex: 1; font-weight: 500; }
+.config-area-name { flex: 1; font-weight: 500; color: var(--text); }
 .config-area-badge {
   font-size: 10px;
   padding: 2px 8px;
@@ -613,7 +662,11 @@ textarea.form-control { resize: vertical; min-height: 60px; }
   background: var(--border);
   color: var(--text-secondary);
 }
+<<<<<<< Updated upstream
 .config-area-badge.ativa { background: rgba(46,125,50,0.15); color: var(--success); }
+=======
+.config-area-badge.ativa { background: var(--area-badge-active-bg); color: var(--success); }
+>>>>>>> Stashed changes
 
 /* ===== SEARCH BOX ===== */
 .search-box {
@@ -626,6 +679,8 @@ textarea.form-control { resize: vertical; min-height: 60px; }
   border: 1px solid var(--border);
   border-radius: var(--radius);
   font-size: 14px;
+  background: var(--surface);
+  color: var(--text);
 }
 .search-box::before {
   content: '🔍';
@@ -656,7 +711,11 @@ textarea.form-control { resize: vertical; min-height: 60px; }
   font-size: 12px;
   cursor: pointer;
   border: 1px solid var(--border);
+<<<<<<< Updated upstream
   background: var(--input-bg);
+=======
+  background: var(--surface);
+>>>>>>> Stashed changes
   color: var(--text);
   transition: all 0.15s;
 }
@@ -666,11 +725,26 @@ textarea.form-control { resize: vertical; min-height: 60px; }
   border-color: var(--primary);
 }
 
+/* ===== CORRELACAO MODULE ===== */
+.reuniao-participant { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--border); }
+.reuniao-cargo { font-size:12px; font-weight:600; color:var(--text-secondary); min-width:140px; flex-shrink:0; }
+.status-badge { font-size:10px; padding:2px 8px; border-radius:10px; color:white; font-weight:500; display:inline-block; }
+.pilar-card { background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px; margin-bottom:12px; }
+.pilar-card h4 { font-size:14px; margin-bottom:4px; color:var(--text); }
+.pilar-card p { font-size:12px; color:var(--text-secondary); margin-bottom:8px; }
+.perguntas-ref { background:var(--bg); border-radius:var(--radius); padding:12px; margin-top:16px; font-size:13px; color:var(--text); }
+.perguntas-ref ol { padding-left:20px; }
+.perguntas-ref li { margin-bottom:8px; line-height:1.4; }
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 640px) {
   .app-header h1 { font-size: 15px; }
   .app-main { padding: 10px; }
+<<<<<<< Updated upstream
   .tab-btn { font-size: 11px; padding: 8px 6px; min-width: 80px; }
+=======
+  .tab-btn { font-size: 11px; padding: 8px 6px; min-width: 80px; flex: 0 0 auto; }
+>>>>>>> Stashed changes
   .dupla-row { flex-direction: column; align-items: stretch; }
   .dupla-label { min-width: unset; margin-bottom: 2px; }
   .retencao-table table { font-size: 11px; }
@@ -689,6 +763,12 @@ textarea.form-control { resize: vertical; min-height: 60px; }
   .tab-btn { font-size: 14px; padding: 14px 12px; }
   .retencao-card-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 }
+@media (min-width: 641px) and (max-width: 1024px) {
+  .app-main { max-width: 768px; }
+}
+@media (min-width: 1025px) {
+  .app-main { max-width: 1200px; }
+}
 
 /* ===== TOAST ===== */
 .toast {
@@ -696,8 +776,8 @@ textarea.form-control { resize: vertical; min-height: 60px; }
   bottom: 80px;
   left: 50%;
   transform: translateX(-50%);
-  background: #333;
-  color: white;
+  background: var(--text);
+  color: var(--surface);
   padding: 10px 20px;
   border-radius: var(--radius);
   font-size: 13px;
@@ -705,9 +785,14 @@ textarea.form-control { resize: vertical; min-height: 60px; }
   animation: fadeIn 0.2s;
   box-shadow: var(--shadow-lg);
 }
+<<<<<<< Updated upstream
 [data-theme="dark"] .toast { background: #424242; }
 .toast.success { background: var(--success); }
 .toast.error { background: var(--danger); }
+=======
+.toast.success { background: var(--success); color: white; }
+.toast.error { background: var(--danger); color: white; }
+>>>>>>> Stashed changes
 
 /* ===== CORRELACAO MODULE ===== */
 .corr-heading { font-size: 18px; font-weight: 600; margin: 12px 0 8px; color: var(--text); }
@@ -865,6 +950,26 @@ const MARCOS_CONFIG = [
 ];
 const ALL_MARCOS_KEYS = MARCOS_CONFIG.flatMap(g => g.items.map(i => i.key));
 
+const MARCOS_SHORT = {
+  entrevistaAcompanhamento: 'Entrev.', sacerdocioAaronico: 'Sac.A',
+  licao1: 'L1', licao2: 'L2', licao3: 'L3', licao4: 'L4', licao5: 'L5',
+  chamado: 'Cham.', frequencia: 'Freq.', historiaFamiliar: 'Hist.F',
+  sacerdocioMelquisedeque: 'Sac.M', templo: 'Temp.',
+  investidura: 'Invest.', selamento: 'Sel.',
+};
+
+const CORRELACAO_CARGOS = [
+  'Líder de Missão', 'Pres. Quórum de Élderes', 'Pres. Soc. Socorro',
+  'Missionários Tempo Integral', 'Missionários de Ala', 'Rep. Moças', 'Rep. Primária',
+];
+const PESSOA_STATUS = {
+  progredindo: { label: 'Progredindo', color: 'var(--success)' },
+  sem_contato: { label: 'Sem Contato', color: 'var(--text-secondary)' },
+  sem_progresso: { label: 'Sem Progresso', color: 'var(--danger)' },
+  data_marcada: { label: 'Data Marcada', color: 'var(--accent)' },
+  batizado: { label: 'Batizado', color: 'var(--primary)' },
+};
+
 // ===== UTILITY FUNCTIONS =====
 function uuid() { return crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2); }
 function $(sel, ctx) { return (ctx || document).querySelector(sel); }
@@ -910,6 +1015,21 @@ function formatDate(dateStr) {
   return `${d}/${m}/${y}`;
 }
 
+// ===== THEME =====
+function loadTheme() {
+  const saved = localStorage.getItem('isud_theme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+  else if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme', 'dark');
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('isud_theme', next);
+  document.querySelector('meta[name="theme-color"]').content = next === 'dark' ? '#121212' : '#1a237e';
+  render();
+}
+
 // ===== APP STATE =====
 const DEFAULT_VOLUNTARIOS = [
   { id:'vol-01', nome:'Onofra e Severino', telefone:'21 97088-0188', endereco:'Rua Polibio, lote 2, quadra 21, Queimados', diasDisponiveis:['sab','dom'], capacidade:2, observacoes:'Tem disponibilidade de dar mais de um dia na semana. Sem dias fixos.', ativo:true },
@@ -950,14 +1070,52 @@ const DEFAULT_STATE = {
     { id: 'paracambi', nome: 'Paracambí', ativo: true },
     { id: 'austin', nome: 'Austin', ativo: true },
   ],
+<<<<<<< Updated upstream
   almoco: { voluntarios: DEFAULT_VOLUNTARIOS.map(v => ({...v})), calendario: {} },
+=======
+  almoco: {
+    voluntarios: [
+      { id:'vol-01', nome:'Onofra e Severino', telefone:'21 97088-0188', endereco:'Rua Polibio, lote 2, quadro 21, Queimados', diasDisponiveis:['sab','dom'], capacidade:2, observacoes:'Tem disponibilidade de dar mais de um dia na semana. Sem dias fixos', ativo:true },
+      { id:'vol-02', nome:'Patrícia e Johnny', telefone:'21 97546-9933', endereco:'Avenida Moaby lote 17 quadra 6, Jardim Queimados, Queimados', diasDisponiveis:['sab','dom'], capacidade:3, observacoes:'Tem disponibilidade para qualquer sábado ou domingo', ativo:true },
+      { id:'vol-03', nome:'Marilene e Antônio', telefone:'21 99105-2249', endereco:'Rua Políbio Lt 3 Qd 21 - Jardim Queimados', diasDisponiveis:['sab','dom'], capacidade:2, observacoes:'Apenas 1º domingo do mês', ativo:true },
+      { id:'vol-04', nome:'Luana', telefone:'21 96858-0836', endereco:'', diasDisponiveis:['sab','dom'], capacidade:3, observacoes:'2X e no início do mês. Gosta de dar 2 dias seguidos. Combinar os dias.', ativo:true },
+      { id:'vol-05', nome:'Valcilene', telefone:'21 96881-5305', endereco:'Rua Paulo Pessoa, lote 10, quadra S, São Cristóvão, Queimados', diasDisponiveis:['sab','dom'], capacidade:3, observacoes:'Deixa quentinhas paga no restaurante.', ativo:true },
+      { id:'vol-06', nome:'Raphael Machado', telefone:'21 96810-6959', endereco:'', diasDisponiveis:['sab','dom'], capacidade:3, observacoes:'', ativo:true },
+      { id:'vol-07', nome:'Analyce e Natã', telefone:'21 96756-4033', endereco:'', diasDisponiveis:['sab','dom'], capacidade:3, observacoes:'', ativo:true },
+      { id:'vol-08', nome:'Claudia e Messias', telefone:'21 96897-8754', endereco:'', diasDisponiveis:['sab','dom'], capacidade:3, observacoes:'Pode dar dia de semana se combinado. A irmã entrega o almoço na Raquel', ativo:true },
+      { id:'vol-09', nome:'Cecília e Renato', telefone:'21 98252-3912', endereco:'', diasDisponiveis:['sab','dom'], capacidade:3, observacoes:'Dá presencial para 2 das duplas e pix para a outra.', ativo:true },
+      { id:'vol-10', nome:'Raquel e Nilsa', telefone:'21 97529-1500', endereco:'', diasDisponiveis:['sab','dom'], capacidade:3, observacoes:'2x no mês.', ativo:true },
+      { id:'vol-11', nome:'Marli', telefone:'21 99393-9501', endereco:'', diasDisponiveis:['sab','dom'], capacidade:1, observacoes:'Pix', ativo:true },
+      { id:'vol-12', nome:'Fernanda e Ítalo', telefone:'21 98348-4987', endereco:'', diasDisponiveis:['sab','dom'], capacidade:3, observacoes:'Combinar qual sábado é possível.', ativo:true },
+      { id:'vol-13', nome:'Taís e Damião', telefone:'22 99205-5456', endereco:'', diasDisponiveis:['sab','dom'], capacidade:3, observacoes:'', ativo:true },
+      { id:'vol-14', nome:'Margarete e Leonardo', telefone:'21 97172-9058', endereco:'', diasDisponiveis:['sab','dom'], capacidade:1, observacoes:'', ativo:true },
+      { id:'vol-15', nome:'Carmelita e Alexandre', telefone:'21 98367-7602', endereco:'', diasDisponiveis:['sab','dom'], capacidade:3, observacoes:'2x no mês. Trabalha 2x na semana. Ligar para confirmar. CURINGA!!', ativo:true },
+      { id:'vol-16', nome:'Natania', telefone:'21 98352-3381', endereco:'', diasDisponiveis:['sab','dom'], capacidade:1, observacoes:'Confirmar o dia', ativo:true },
+      { id:'vol-17', nome:'Dayana e Kelner', telefone:'21 97025-6168', endereco:'', diasDisponiveis:['sab','dom'], capacidade:3, observacoes:'Sempre o último domingo', ativo:true },
+      { id:'vol-18', nome:'Mariah e Bispo França', telefone:'21 99122-8784', endereco:'', diasDisponiveis:['sab','dom'], capacidade:3, observacoes:'Fim do mês', ativo:true },
+      { id:'vol-19', nome:'Amanda e Raphael', telefone:'21 96697-1736', endereco:'', diasDisponiveis:['sab','dom'], capacidade:3, observacoes:'Fim do mês. Confirmar a data', ativo:true },
+      { id:'vol-20', nome:'Fernanda e Gabriel', telefone:'21 96863-7425', endereco:'Estrada Antônio Soares n°757 bloco 5 apto 308, Vila São João, Queimados', diasDisponiveis:['sab','dom'], capacidade:1, observacoes:'Pix', ativo:true },
+      { id:'vol-21', nome:'Carine e Luiza', telefone:'21 97585-8951', endereco:'Rua Peter schutzwence, 51 fanchen, queimados', diasDisponiveis:['sab','dom'], capacidade:2, observacoes:'Pix', ativo:true },
+      { id:'vol-22', nome:'Regina', telefone:'21 97656-5487', endereco:'Rua doutor osmar barbosa 115, Quebra Coco, Queimados', diasDisponiveis:['sab','dom'], capacidade:1, observacoes:'', ativo:true },
+      { id:'vol-23', nome:'Luciana', telefone:'21 99033-5549', endereco:'', diasDisponiveis:['sab','dom'], capacidade:1, observacoes:'', ativo:true },
+      { id:'vol-24', nome:'Mirtes', telefone:'21 97342-1076', endereco:'', diasDisponiveis:['sab','dom'], capacidade:1, observacoes:'', ativo:true },
+      { id:'vol-25', nome:'Iara', telefone:'21 99196-3931', endereco:'Paracambí', diasDisponiveis:['sab','dom'], capacidade:1, observacoes:'Presencial', ativo:true },
+      { id:'vol-26', nome:'Patrícia e Johnny (2)', telefone:'21 99212-7835', endereco:'', diasDisponiveis:['sab','dom'], capacidade:1, observacoes:'', ativo:true },
+    ],
+    calendario: {}
+  },
+>>>>>>> Stashed changes
   disponibilidade: { membros: [] },
   menosAtivos: {},
   recemConversos: {},
   correlacao: {
     reunioes: {},
     pessoasEnsinadas: [],
+<<<<<<< Updated upstream
     planoAla: { metasBemVindos: '', metasCompartilhar: '', metasApoiar: '', metasProgresso: '' },
+=======
+    planoAla: { metasBemVindos: '', metasCompartilhar: '', metasApoiar: '', metasProgresso: '' }
+>>>>>>> Stashed changes
   },
 };
 
@@ -985,6 +1143,7 @@ const State = {
     localStorage.setItem('isud_data', JSON.stringify(this.data));
   },
   migrate() {
+<<<<<<< Updated upstream
     const d = this.data;
     if (!d.version) d.version = 1;
 
@@ -1018,6 +1177,19 @@ const State = {
     ['metasBemVindos','metasCompartilhar','metasApoiar','metasProgresso'].forEach(k => {
       if (typeof d.correlacao.planoAla[k] !== 'string') d.correlacao.planoAla[k] = '';
     });
+=======
+    if (!this.data.correlacao) {
+      this.data.correlacao = { reunioes:{}, pessoasEnsinadas:[], planoAla:{ metasBemVindos:'', metasCompartilhar:'', metasApoiar:'', metasProgresso:'' } };
+    }
+    if (!this.data.areas.find(a => a.id === 'austin')) {
+      this.data.areas.push({ id:'austin', nome:'Austin', ativo:true });
+    }
+    this.data.areas.forEach(a => {
+      if (!this.data.menosAtivos[a.id]) this.data.menosAtivos[a.id] = [];
+      if (!this.data.recemConversos[a.id]) this.data.recemConversos[a.id] = [];
+    });
+    this.data.version = 2;
+>>>>>>> Stashed changes
   },
   getActiveAreas() {
     return this.data.areas.filter(a => a.ativo);
@@ -1173,6 +1345,8 @@ function toggleTheme() {
 // ===== ROUTER =====
 let currentTab = 'almoco';
 let almocoSubView = 'calendario';
+let correlacaoSubView = 'reuniao';
+let correlacaoDate = new Date().toISOString().slice(0,10);
 
 const TABS = [
   { id: 'almoco', label: 'Cal. Almoço', icon: '🍽️' },
@@ -1190,11 +1364,16 @@ function navigate(tab) {
 // ===== MAIN RENDER =====
 function render() {
   const app = $('#app');
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   app.innerHTML = `
     <header class="app-header">
       <h1>iSUD - Apoio Missionário</h1>
       <div class="header-actions">
+<<<<<<< Updated upstream
         <button class="header-btn" id="theme-btn" title="Alternar tema" onclick="toggleTheme()">${getThemeIcon()}</button>
+=======
+        <button class="header-btn" id="theme-btn" title="Alternar tema" onclick="toggleTheme()">${isDark ? '☀️' : '🌙'}</button>
+>>>>>>> Stashed changes
         <button class="header-btn" id="config-btn" title="Configurações" onclick="showConfig()">⚙️</button>
         <button class="header-btn ${isAdmin ? 'active' : ''}" id="admin-btn" title="${isAdmin ? 'Bloquear' : 'Desbloquear'}" onclick="${isAdmin ? 'lockAdmin()' : 'requireAdmin().then(()=>render())'}">${isAdmin ? '🔓' : '🔒'}</button>
       </div>
@@ -1208,8 +1387,13 @@ function render() {
   switch(currentTab) {
     case 'almoco': renderAlmoco(main); break;
     case 'disponibilidade': renderDisponibilidade(main); break;
+<<<<<<< Updated upstream
     case 'menosAtivos': renderRetencao(main, 'menosAtivos', 'Caminho dos Menos Ativos'); break;
     case 'recemConversos': renderRetencao(main, 'recemConversos', 'Caminho dos Recém-Conversos'); break;
+=======
+    case 'menosAtivos': renderRetencao(main, 'menosAtivos', 'Caminho do Convênio - Menos Ativos'); break;
+    case 'recemConversos': renderRetencao(main, 'recemConversos', 'Caminho do Convênio - Recém-Conversos'); break;
+>>>>>>> Stashed changes
     case 'correlacao': renderCorrelacao(main); break;
   }
 }
@@ -1283,8 +1467,6 @@ function renderCalendario(container, areas) {
   $$('.dupla-select', container).forEach(sel => {
     sel.addEventListener('change', function() {
       if (this.value === '__outro') {
-        const date = this.closest('.weekend-card-body') ? null : null; // handled by inline handler
-        // Re-render to show text input
         render();
       }
     });
@@ -1293,7 +1475,6 @@ function renderCalendario(container, areas) {
 
 async function saveCalEntry(date, areaId, value) {
   if (value === '__outro') {
-    // Show prompt for custom name
     showModal('Nome personalizado', `
       <div class="form-group">
         <label>Nome da família/pessoa</label>
@@ -1508,7 +1689,7 @@ function renderDispMember(m) {
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:12px;color:var(--text-secondary)">${escHtml(m.telefone || '')}</span>
           <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();editMembro('${m.id}')">Editar</button>
-          <span>${expanded ? '▲' : '▼'}</span>
+          <span style="color:var(--text-secondary)">${expanded ? '▲' : '▼'}</span>
         </div>
       </div>
       ${expanded ? `
@@ -1525,7 +1706,7 @@ function renderDispMember(m) {
               <tbody>
                 ${HORARIOS.map(h => `
                   <tr>
-                    <td rowspan="2" style="font-weight:600;font-size:11px;background:var(--bg)">${h}</td>
+                    <td rowspan="2" style="font-weight:600;font-size:11px;background:var(--bg);color:var(--text)">${h}</td>
                     <td class="type-label" style="color:var(--primary)">Pres.</td>
                     ${DIAS_KEYS.map(d => {
                       const checked = (m.presencial[d] || []).includes(h);
@@ -1678,10 +1859,10 @@ function executeBusca() {
       const pres = (m.presencial[dia] || []).includes(hora);
       const vid = (m.videochamada[dia] || []).includes(hora);
       return `<div style="padding:8px;border-bottom:1px solid var(--border)">
-        <strong>${escHtml(m.nome)}</strong> ${m.telefone ? '· ' + escHtml(m.telefone) : ''}
+        <strong style="color:var(--text)">${escHtml(m.nome)}</strong> ${m.telefone ? '· ' + escHtml(m.telefone) : ''}
         <div style="margin-top:2px">
           ${pres ? '<span class="tag active-tag">Presencial</span>' : ''}
-          ${vid ? '<span class="tag" style="background:#e8f5e9;color:var(--success)">Vídeo</span>' : ''}
+          ${vid ? '<span class="tag" style="background:var(--video-tag-bg);color:var(--success)">Vídeo</span>' : ''}
         </div>
       </div>`;
     }).join('');
@@ -1700,7 +1881,11 @@ function renderRetencao(container, dataKey, title) {
   const isDesktop = window.innerWidth > 640;
 
   container.innerHTML = `
+<<<<<<< Updated upstream
     <h2 class="retencao-section-heading">${escHtml(title)}</h2>
+=======
+    <h2 style="font-size:16px;font-weight:600;margin-bottom:12px;color:var(--text)">${escHtml(title)}</h2>
+>>>>>>> Stashed changes
     <div class="toolbar">
       <select onchange="retencaoArea['${dataKey}']=this.value;render()">
         ${areas.map(a => `<option value="${a.id}" ${a.id === selectedArea ? 'selected' : ''}>${escHtml(a.nome)}</option>`).join('')}
@@ -1714,19 +1899,35 @@ function renderRetencao(container, dataKey, title) {
           <h3>Nenhuma pessoa cadastrada</h3>
           <p>Toque no botão + para adicionar</p>
         </div>
+<<<<<<< Updated upstream
       ` : (isDesktop ? renderRetencaoGrid(pessoas, dataKey, isConversos) : renderRetencaoCards(pessoas, dataKey, isConversos))}
+=======
+      ` : renderRetencaoContent(pessoas, dataKey, isConversos)}
+>>>>>>> Stashed changes
     </div>
     <button class="fab" onclick="addPessoaRetencao('${dataKey}')">+</button>
   `;
 }
 
+<<<<<<< Updated upstream
 function renderRetencaoGrid(pessoas, dataKey, isConversos) {
   const total = ALL_MARCOS_KEYS.length;
+=======
+function renderRetencaoContent(pessoas, dataKey, isConversos) {
+  if (window.innerWidth > 640) {
+    return renderRetencaoTable(pessoas, dataKey, isConversos);
+  }
+  return renderRetencaoCards(pessoas, dataKey, isConversos);
+}
+
+function renderRetencaoTable(pessoas, dataKey, isConversos) {
+>>>>>>> Stashed changes
   return `
     <div class="retencao-table">
       <table>
         <thead>
           <tr>
+<<<<<<< Updated upstream
             <th rowspan="2" style="text-align:left;padding-left:8px">Nome</th>
             ${MARCOS_CONFIG.map(g => `<th colspan="${g.items.length}" class="group-header">${escHtml(g.group)}</th>`).join('')}
             <th rowspan="2" class="retencao-progress-cell">Progresso</th>
@@ -1734,14 +1935,24 @@ function renderRetencaoGrid(pessoas, dataKey, isConversos) {
           </tr>
           <tr>
             ${MARCOS_CONFIG.flatMap(g => g.items).map(i => `<th title="${escHtml(i.label)}">${escHtml(i.abbr)}</th>`).join('')}
+=======
+            <th style="text-align:left;min-width:150px">Nome</th>
+            ${ALL_MARCOS_KEYS.map(k => `<th title="${escHtml(MARCOS_CONFIG.flatMap(g=>g.items).find(i=>i.key===k)?.label||k)}">${MARCOS_SHORT[k]||k}</th>`).join('')}
+            <th>%</th>
+>>>>>>> Stashed changes
           </tr>
         </thead>
         <tbody>
           ${pessoas.map(p => {
+<<<<<<< Updated upstream
+=======
+            const total = ALL_MARCOS_KEYS.length;
+>>>>>>> Stashed changes
             const done = ALL_MARCOS_KEYS.filter(k => p.marcos[k]).length;
             const pct = Math.round((done / total) * 100);
             return `
               <tr>
+<<<<<<< Updated upstream
                 <td>
                   <div style="font-weight:600">${escHtml(p.nome)}</div>
                   ${isConversos && p.dataBatismo ? `<div style="font-size:10px;color:var(--text-secondary)">Bat: ${formatDate(p.dataBatismo)}</div>` : ''}
@@ -1759,6 +1970,21 @@ function renderRetencaoGrid(pessoas, dataKey, isConversos) {
                 <td>
                   <button class="btn btn-sm btn-outline" onclick="editPessoaRetencao('${dataKey}','${p.id}')">✏️</button>
                 </td>
+=======
+                <td style="text-align:left">
+                  <div style="display:flex;align-items:center;gap:4px">
+                    <span style="flex:1;cursor:pointer;color:var(--text)" onclick="editPessoaRetencao('${dataKey}','${p.id}')">${escHtml(p.nome)}</span>
+                  </div>
+                  <div class="progress-bar" style="margin-top:2px">
+                    <div class="progress-bar-fill" style="width:${pct}%"></div>
+                  </div>
+                </td>
+                ${ALL_MARCOS_KEYS.map(k => {
+                  const val = p.marcos[k];
+                  return `<td><input type="checkbox" class="cb" ${val ? 'checked' : ''} onchange="toggleMarco('${dataKey}','${p.id}','${k}',this.checked)"></td>`;
+                }).join('')}
+                <td style="font-size:11px;font-weight:600;color:${pct === 100 ? 'var(--success)' : 'var(--text-secondary)'}">${pct}%</td>
+>>>>>>> Stashed changes
               </tr>
             `;
           }).join('')}
@@ -1891,6 +2117,7 @@ function deletePessoaRetencao(dataKey, pessoaId) {
   });
 }
 
+<<<<<<< Updated upstream
 // ===== MODULE: CORRELACAO MISSIONARIA =====
 const PESSOA_STATUS = {
   progredindo: { label: 'Progredindo', css: 'progredindo' },
@@ -1921,10 +2148,16 @@ function renderCorrelacao(container) {
     <div class="corr-quote">
       Baseado no Manual Geral, Capítulo 23: "O trabalho missionário da Igreja é dirigido pelo bispo e pelo líder missionário da ala."
     </div>
+=======
+// ===== MODULE: CORRELACAO =====
+function renderCorrelacao(container) {
+  container.innerHTML = `
+>>>>>>> Stashed changes
     <div class="toolbar">
       <div class="segmented">
         <button class="${correlacaoSubView === 'reuniao' ? 'active' : ''}" onclick="correlacaoSubView='reuniao';render()">Reunião</button>
         <button class="${correlacaoSubView === 'pessoas' ? 'active' : ''}" onclick="correlacaoSubView='pessoas';render()">Pessoas</button>
+<<<<<<< Updated upstream
         <button class="${correlacaoSubView === 'plano' ? 'active' : ''}" onclick="correlacaoSubView='plano';render()">Plano da Ala</button>
       </div>
     </div>
@@ -2097,10 +2330,157 @@ function renderCorrelacaoPessoas(container) {
             <div style="margin-top:8px;display:flex;gap:6px;justify-content:flex-end">
               <button class="btn btn-sm btn-outline" onclick="editCorrelacaoPessoa('${p.id}')">✏️ Editar</button>
             </div>
+=======
+        <button class="${correlacaoSubView === 'plano' ? 'active' : ''}" onclick="correlacaoSubView='plano';render()">Plano</button>
+      </div>
+    </div>
+    <div id="correlacao-content"></div>
+  `;
+  const content = $('#correlacao-content');
+  switch(correlacaoSubView) {
+    case 'reuniao': renderCorrelacaoReuniao(content); break;
+    case 'pessoas': renderCorrelacaoPessoas(content); break;
+    case 'plano': renderCorrelacaoPlano(content); break;
+  }
+}
+
+function renderCorrelacaoReuniao(container) {
+  const reunioes = State.data.correlacao.reunioes;
+  if (!reunioes[correlacaoDate]) {
+    reunioes[correlacaoDate] = {
+      participantes: CORRELACAO_CARGOS.map(c => ({ cargo: c, nome: '', presente: false })),
+      notas: ''
+    };
+    State.save();
+  }
+  const reuniao = reunioes[correlacaoDate];
+
+  container.innerHTML = `
+    <div class="form-group">
+      <label>Data da Reunião</label>
+      <input type="date" class="form-control" value="${correlacaoDate}" onchange="correlacaoDate=this.value;render()" style="max-width:200px">
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Participantes</span>
+      </div>
+      ${reuniao.participantes.map((p, i) => `
+        <div class="reuniao-participant">
+          <input type="checkbox" ${p.presente ? 'checked' : ''} onchange="toggleReuniaoPart(${i},this.checked)" style="accent-color:var(--primary)">
+          <span class="reuniao-cargo">${escHtml(p.cargo)}</span>
+          <input type="text" class="form-control" style="flex:1" value="${escHtml(p.nome)}" placeholder="Nome" onchange="updateReuniaoPart(${i},'nome',this.value)">
+        </div>
+      `).join('')}
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Notas da Reunião</span>
+      </div>
+      <textarea class="form-control" rows="4" placeholder="Anotações, decisões, compromissos..." onchange="updateReuniaoNotas(this.value)">${escHtml(reuniao.notas)}</textarea>
+    </div>
+    <div class="card" style="cursor:pointer" onclick="this.querySelector('.perguntas-body').style.display=this.querySelector('.perguntas-body').style.display==='none'?'block':'none'">
+      <div class="card-header" style="margin-bottom:0">
+        <span class="card-title">Perguntas Orientadoras</span>
+        <span style="color:var(--text-secondary)">▼</span>
+      </div>
+      <div class="perguntas-body" style="display:none;margin-top:12px">
+        <div class="perguntas-ref">
+          <p style="font-weight:600;margin-bottom:8px">Baseado no Manual Geral 23.4:</p>
+          <ol>
+            <li>Como podemos ajudar as pessoas que estão sendo ensinadas pelos missionários a fazer e cumprir convênios com Deus?</li>
+            <li>Como podemos encontrar pessoas que serão abençoadas pelo evangelho restaurado de Jesus Cristo?</li>
+            <li>Como podemos ajudar os membros novos e os que estão retornando à atividade a progredir no caminho do convênio?</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function toggleReuniaoPart(idx, checked) {
+  const reuniao = State.data.correlacao.reunioes[correlacaoDate];
+  if (reuniao) {
+    reuniao.participantes[idx].presente = checked;
+    State.save();
+  }
+}
+
+function updateReuniaoPart(idx, field, value) {
+  const reuniao = State.data.correlacao.reunioes[correlacaoDate];
+  if (reuniao) {
+    reuniao.participantes[idx][field] = value;
+    State.save();
+  }
+}
+
+function updateReuniaoNotas(value) {
+  const reuniao = State.data.correlacao.reunioes[correlacaoDate];
+  if (reuniao) {
+    reuniao.notas = value;
+    State.save();
+  }
+}
+
+// --- Correlacao Pessoas ---
+let corPessoaArea = '';
+let corPessoaStatus = '';
+let corPessoaSearch = '';
+
+function renderCorrelacaoPessoas(container) {
+  const areas = State.getActiveAreas();
+  let pessoas = State.data.correlacao.pessoasEnsinadas || [];
+  if (corPessoaArea) pessoas = pessoas.filter(p => p.area === corPessoaArea);
+  if (corPessoaStatus) pessoas = pessoas.filter(p => p.status === corPessoaStatus);
+  if (corPessoaSearch) {
+    const q = corPessoaSearch.toLowerCase();
+    pessoas = pessoas.filter(p => p.nome.toLowerCase().includes(q));
+  }
+
+  container.innerHTML = `
+    <div class="toolbar">
+      <select onchange="corPessoaArea=this.value;render()">
+        <option value="">Todas Áreas</option>
+        ${areas.map(a => `<option value="${a.id}" ${corPessoaArea === a.id ? 'selected' : ''}>${escHtml(a.nome)}</option>`).join('')}
+      </select>
+      <select onchange="corPessoaStatus=this.value;render()">
+        <option value="">Todos Status</option>
+        ${Object.entries(PESSOA_STATUS).map(([k,v]) => `<option value="${k}" ${corPessoaStatus === k ? 'selected' : ''}>${v.label}</option>`).join('')}
+      </select>
+    </div>
+    <div class="search-box">
+      <input type="text" placeholder="Buscar pessoa..." value="${escHtml(corPessoaSearch)}" oninput="corPessoaSearch=this.value;render()">
+    </div>
+    <div id="cor-pessoas-list">
+      ${pessoas.length === 0 ? `
+        <div class="empty-state">
+          <div class="icon">📋</div>
+          <h3>Nenhuma pessoa cadastrada</h3>
+          <p>Toque no botão + para adicionar pessoas sendo ensinadas</p>
+        </div>
+      ` : pessoas.map(p => {
+        const statusObj = PESSOA_STATUS[p.status] || PESSOA_STATUS.progredindo;
+        const areaName = State.getAreaName(p.area);
+        const areaColor = State.getAreaColor(p.area);
+        return `
+          <div class="card" style="cursor:pointer" onclick="editCorPessoa('${p.id}')">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+              <h4 style="font-size:14px;color:var(--text)">${escHtml(p.nome)}</h4>
+              <span class="status-badge" style="background:${statusObj.color}">${statusObj.label}</span>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
+              <span class="tag" style="background:${areaColor};color:white">${escHtml(areaName)}</span>
+              ${p.licaoAtual ? `<span class="tag">Lição ${p.licaoAtual}</span>` : ''}
+            </div>
+            ${p.missionarios ? `<p style="font-size:11px;color:var(--text-secondary)">Missionários: ${escHtml(p.missionarios)}</p>` : ''}
+            ${p.membroAnfitriao ? `<p style="font-size:11px;color:var(--text-secondary)">Anfitrião: ${escHtml(p.membroAnfitriao)}</p>` : ''}
+            ${p.dataBatismo ? `<p style="font-size:11px;color:var(--text-secondary)">Batismo: ${formatDate(p.dataBatismo)}</p>` : ''}
+            ${p.notas ? `<p style="font-size:11px;color:var(--text-secondary);margin-top:4px">${escHtml(p.notas)}</p>` : ''}
+>>>>>>> Stashed changes
           </div>
         `;
       }).join('')}
     </div>
+<<<<<<< Updated upstream
     <button class="fab" onclick="addCorrelacaoPessoa()">+</button>
   `;
 }
@@ -2111,11 +2491,24 @@ function pessoaCorrelacaoForm(p) {
   return `
     <div class="form-group">
       <label>Nome da Pessoa</label>
+=======
+    <button class="fab" onclick="addCorPessoa()">+</button>
+  `;
+}
+
+function corPessoaForm(p) {
+  const pessoa = p || { nome:'', area:'', status:'progredindo', missionarios:'', membroAnfitriao:'', licaoAtual:'', dataBatismo:'', notas:'' };
+  const areas = State.getActiveAreas();
+  return `
+    <div class="form-group">
+      <label>Nome</label>
+>>>>>>> Stashed changes
       <input type="text" id="cp-nome" class="form-control" value="${escHtml(pessoa.nome)}" placeholder="Nome completo">
     </div>
     <div class="form-group">
       <label>Área</label>
       <select id="cp-area" class="form-control">
+<<<<<<< Updated upstream
         ${areas.map(a => `<option value="${a.id}" ${a.id === pessoa.area ? 'selected' : ''}>${escHtml(a.nome)}</option>`).join('')}
       </select>
     </div>
@@ -2146,10 +2539,45 @@ function pessoaCorrelacaoForm(p) {
     <div class="form-group">
       <label>Notas</label>
       <textarea id="cp-notas" class="form-control" rows="3" placeholder="Progresso, desafios, próximos passos...">${escHtml(pessoa.notas || '')}</textarea>
+=======
+        <option value="">Selecionar...</option>
+        ${areas.map(a => `<option value="${a.id}" ${pessoa.area === a.id ? 'selected' : ''}>${escHtml(a.nome)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select id="cp-status" class="form-control">
+        ${Object.entries(PESSOA_STATUS).map(([k,v]) => `<option value="${k}" ${pessoa.status === k ? 'selected' : ''}>${v.label}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Missionários</label>
+      <input type="text" id="cp-miss" class="form-control" value="${escHtml(pessoa.missionarios)}" placeholder="Nomes dos missionários">
+    </div>
+    <div class="form-group">
+      <label>Membro Anfitrião</label>
+      <input type="text" id="cp-anf" class="form-control" value="${escHtml(pessoa.membroAnfitriao)}" placeholder="Nome do membro">
+    </div>
+    <div class="form-group">
+      <label>Lição Atual</label>
+      <select id="cp-licao" class="form-control">
+        <option value="">Nenhuma</option>
+        ${[1,2,3,4,5].map(n => `<option value="${n}" ${String(pessoa.licaoAtual) === String(n) ? 'selected' : ''}>Lição ${n}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Data do Batismo</label>
+      <input type="date" id="cp-bat" class="form-control" value="${pessoa.dataBatismo || ''}">
+    </div>
+    <div class="form-group">
+      <label>Notas</label>
+      <textarea id="cp-notas" class="form-control" placeholder="Observações...">${escHtml(pessoa.notas)}</textarea>
+>>>>>>> Stashed changes
     </div>
   `;
 }
 
+<<<<<<< Updated upstream
 function getPessoaCorrelacaoFormData(id) {
   const nome = $('#cp-nome').value.trim();
   if (!nome) { showToast('Nome é obrigatório', 'error'); return null; }
@@ -2171,6 +2599,30 @@ async function addCorrelacaoPessoa() {
   if (!await requireAdmin()) return;
   showModal('Nova Pessoa Ensinada', pessoaCorrelacaoForm(), () => {
     const p = getPessoaCorrelacaoFormData();
+=======
+function getCorPessoaFormData(existingId) {
+  const nome = $('#cp-nome').value.trim();
+  if (!nome) { showToast('Nome é obrigatório', 'error'); return null; }
+  const area = $('#cp-area').value;
+  if (!area) { showToast('Selecione uma área', 'error'); return null; }
+  return {
+    id: existingId || uuid(),
+    nome,
+    area,
+    status: $('#cp-status').value,
+    missionarios: $('#cp-miss').value.trim(),
+    membroAnfitriao: $('#cp-anf').value.trim(),
+    licaoAtual: $('#cp-licao').value,
+    dataBatismo: $('#cp-bat').value,
+    notas: $('#cp-notas').value.trim(),
+  };
+}
+
+async function addCorPessoa() {
+  if (!await requireAdmin()) return;
+  showModal('Nova Pessoa', corPessoaForm(), () => {
+    const p = getCorPessoaFormData();
+>>>>>>> Stashed changes
     if (!p) return false;
     State.data.correlacao.pessoasEnsinadas.push(p);
     State.save();
@@ -2180,6 +2632,7 @@ async function addCorrelacaoPessoa() {
   });
 }
 
+<<<<<<< Updated upstream
 async function editCorrelacaoPessoa(id) {
   if (!await requireAdmin()) return;
   const p = State.data.correlacao.pessoasEnsinadas.find(x => x.id === id);
@@ -2192,6 +2645,20 @@ async function editCorrelacaoPessoa(id) {
     if (!updated) return false;
     const idx = State.data.correlacao.pessoasEnsinadas.findIndex(x => x.id === id);
     if (idx >= 0) State.data.correlacao.pessoasEnsinadas[idx] = { ...p, ...updated };
+=======
+async function editCorPessoa(id) {
+  if (!await requireAdmin()) return;
+  const p = State.data.correlacao.pessoasEnsinadas.find(x => x.id === id);
+  if (!p) return;
+  showModal('Editar Pessoa', corPessoaForm(p) + `
+    <hr style="margin:12px 0">
+    <button class="btn btn-danger btn-sm btn-block" onclick="deleteCorPessoa('${id}')">Excluir Pessoa</button>
+  `, () => {
+    const data = getCorPessoaFormData(id);
+    if (!data) return false;
+    const idx = State.data.correlacao.pessoasEnsinadas.findIndex(x => x.id === id);
+    if (idx >= 0) State.data.correlacao.pessoasEnsinadas[idx] = data;
+>>>>>>> Stashed changes
     State.save();
     render();
     showToast('Pessoa atualizada!', 'success');
@@ -2199,9 +2666,15 @@ async function editCorrelacaoPessoa(id) {
   });
 }
 
+<<<<<<< Updated upstream
 function deleteCorrelacaoPessoa(id) {
   closeModal();
   showConfirm('Excluir Pessoa', 'Tem certeza que deseja excluir?', () => {
+=======
+function deleteCorPessoa(id) {
+  closeModal();
+  showConfirm('Excluir Pessoa', 'Tem certeza?', () => {
+>>>>>>> Stashed changes
     State.data.correlacao.pessoasEnsinadas = State.data.correlacao.pessoasEnsinadas.filter(p => p.id !== id);
     State.save();
     render();
@@ -2209,6 +2682,7 @@ function deleteCorrelacaoPessoa(id) {
   });
 }
 
+<<<<<<< Updated upstream
 // --- Sub-view 3: Plano da Ala ---
 function renderCorrelacaoPlano(container) {
   const plano = State.data.correlacao.planoAla;
@@ -2242,6 +2716,28 @@ async function updatePlanoAla(key, value) {
   if (!isAdmin) {
     if (!await requireAdmin()) { render(); return; }
   }
+=======
+// --- Correlacao Plano ---
+function renderCorrelacaoPlano(container) {
+  const plano = State.data.correlacao.planoAla;
+  const pilares = [
+    { key: 'metasBemVindos', icon: '🤝', title: 'Receber Bem', desc: 'Ajudar os participantes a sentir-se bem-vindos nas reuniões e atividades' },
+    { key: 'metasCompartilhar', icon: '📢', title: 'Compartilhar o Evangelho', desc: 'Ajudar os membros a vivenciar a alegria de compartilhar o evangelho' },
+    { key: 'metasApoiar', icon: '🙏', title: 'Apoiar os que Estão Sendo Ensinados', desc: 'Apoiar as pessoas que estão sendo ensinadas pelos missionários' },
+    { key: 'metasProgresso', icon: '📈', title: 'Progresso Espiritual', desc: 'Ajudar os membros novos a progredir espiritualmente' },
+  ];
+
+  container.innerHTML = pilares.map(p => `
+    <div class="pilar-card">
+      <h4>${p.icon} ${escHtml(p.title)}</h4>
+      <p>${escHtml(p.desc)}</p>
+      <textarea class="form-control" rows="3" placeholder="Metas e anotações para este pilar..." onchange="savePlano('${p.key}',this.value)" onblur="savePlano('${p.key}',this.value)">${escHtml(plano[p.key] || '')}</textarea>
+    </div>
+  `).join('');
+}
+
+function savePlano(key, value) {
+>>>>>>> Stashed changes
   State.data.correlacao.planoAla[key] = value;
   State.save();
 }
@@ -2250,7 +2746,7 @@ async function updatePlanoAla(key, value) {
 function showConfig() {
   const areas = State.data.areas;
   showModal('Configurações', `
-    <h4 style="margin-bottom:12px">Áreas Geográficas</h4>
+    <h4 style="margin-bottom:12px;color:var(--text)">Áreas Geográficas</h4>
     <div id="config-areas">
       ${areas.map((a, i) => `
         <div class="config-area-item">
@@ -2263,7 +2759,7 @@ function showConfig() {
     </div>
     <button class="btn btn-sm btn-accent btn-block" style="margin-top:12px" onclick="addArea()">+ Nova Área</button>
     <hr style="margin:16px 0">
-    <h4 style="margin-bottom:12px">Dados</h4>
+    <h4 style="margin-bottom:12px;color:var(--text)">Dados</h4>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-sm btn-outline" onclick="exportData()">📥 Exportar JSON</button>
       <button class="btn btn-sm btn-outline" onclick="importData()">📤 Importar JSON</button>
@@ -2336,6 +2832,8 @@ function deleteArea(areaId) {
     delete State.data.recemConversos[areaId];
     // Clean calendar entries for this area
     Object.values(State.data.almoco.calendario).forEach(day => { delete day[areaId]; });
+    // Clean correlacao people for this area
+    State.data.correlacao.pessoasEnsinadas = State.data.correlacao.pessoasEnsinadas.filter(p => p.area !== areaId);
     State.save();
     showConfig();
     showToast('Área excluída');
@@ -2439,6 +2937,7 @@ window.addEventListener('resize', () => {
 // ===== INIT =====
 applyTheme(getStoredTheme());
 State.load();
+loadTheme();
 render();
 </script>
 </body>
