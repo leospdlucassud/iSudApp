@@ -274,6 +274,20 @@ export const PARTICIPANTES_COORDENACAO = [
   'Missionários de tempo integral',
 ];
 
+/**
+ * Seções do plano da ala para compartilhar o evangelho.
+ *
+ * O Manual Geral 23.6 pede que o plano — feito pelo presidente do quórum de
+ * élderes, pela presidente da Sociedade de Socorro e pelo líder de missão,
+ * com aprovação do bispo — cubra estes quatro pontos.
+ */
+export const SECOES_PLANO = [
+  { key: 'acolher',     titulo: 'Receber bem quem chega',      dica: 'Como a ala acolhe visitantes e pessoas sendo ensinadas nas reuniões.' },
+  { key: 'compartilhar', titulo: 'Compartilhar o evangelho',   dica: 'Amar, compartilhar e convidar — o que a ala vai fazer neste trimestre.' },
+  { key: 'apoiar',      titulo: 'Apoiar quem está sendo ensinado', dica: 'Referências, lições com membros e acompanhamento à sacramental.' },
+  { key: 'progresso',   titulo: 'Progresso espiritual',        dica: 'Como fortalecer membros novos e os que voltam à atividade.' },
+];
+
 export const STATUS_PESSOA = {
   progredindo:  { label: 'Progredindo',   tom: 'ok'   },
   dataMarcada:  { label: 'Data marcada',  tom: 'info' },

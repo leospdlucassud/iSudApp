@@ -17,18 +17,17 @@
 import {
   AREAS_PADRAO, MARCOS, MARCOS_ITENS, MESES, TIPOS_ACOMPANHADO, corDaArea,
 } from '../config.js';
-import { cartaoIndicador, n } from '../charts.js';
+import { cartaoIndicador } from '../charts.js';
 import {
-  comparaNome, dataCurta, dataLonga, diasEntre, domingosDoMes, hoje, pct,
-} from '../util.js';
+  DIAS_JANELA, alertasDoCaminho, marcoFeito as buscarMarco, marcosDe,
+  mesesNoCaminho, precisaDeAtencao, presencaEm as buscarPresenca, progresso as calcProgresso,
+} from '../regras.js';
+import { comparaNome, dataCurta, dataLonga, domingosDoMes, hoje } from '../util.js';
 import { confirmar, el, modal, toast, vazio } from '../ui.js';
 
 const COL_PESSOAS = 'caminho_pessoas';
 const COL_MARCOS  = 'caminho_marcos';
 const COL_FREQ    = 'caminho_frequencia';
-
-/** Janela oficial de acompanhamento. */
-const DIAS_JANELA = 730;
 
 let ctx, raiz;
 let aba = 'acompanhamento';
@@ -73,60 +72,11 @@ async function recarregar() {
 const visiveis = () => pessoas.filter(p =>
   p.ativo !== false && (filtroTipo === 'todos' || p.tipo === filtroTipo));
 
-const diasNoCaminho = (p) => diasEntre(p.data_inicio, hoje());
-const mesesNoCaminho = (p) => Math.floor(diasNoCaminho(p) / 30.44);
-
-/**
- * Marcos que valem para esta pessoa.
- * Ordenação do sacerdócio só se aplica a homens.
- */
-const marcosDe = (p) =>
-  MARCOS_ITENS.filter(m => m.condicional !== 'homem' || p.sexo === 'm');
-
-const marcoFeito = (pessoaId, key) =>
-  marcos.find(m => m.pessoa_id === pessoaId && m.marco === key);
-
-function progresso(p) {
-  const aplicaveis = marcosDe(p);
-  const feitos = aplicaveis.filter(m => marcoFeito(p.id, m.key)).length;
-  return { feitos, total: aplicaveis.length, pct: pct(feitos, aplicaveis.length) };
-}
-
-const presencaEm = (pessoaId, domingo) =>
-  frequencias.find(f => f.pessoa_id === pessoaId && f.domingo === domingo);
-
-/**
- * Pendências que o conselho da ala precisa ver.
- * Só conta ausência REGISTRADA — falta de registro não é falta.
- */
-function alertas(p) {
-  const out = [];
-  const dias = diasNoCaminho(p);
-
-  if (p.tipo === 'retornando' && !p.consentimento) {
-    out.push({ tom: 'err', texto: 'Sem consentimento registrado' });
-  }
-  if (dias > 30 && !marcoFeito(p.id, 'entrevistaAcompanhamento')) {
-    out.push({ tom: 'err', texto: `${dias} dias sem entrevista de acompanhamento` });
-  }
-  if (dias > 180 && !marcoFeito(p.id, 'chamado')) {
-    out.push({ tom: 'warn', texto: 'Mais de 6 meses sem chamado' });
-  }
-
-  const ausencias = frequencias
-    .filter(f => f.pessoa_id === p.id && f.presente === false)
-    .map(f => f.domingo)
-    .sort()
-    .slice(-3);
-  if (ausencias.length === 3) {
-    out.push({ tom: 'warn', texto: `Faltou nos 3 últimos domingos registrados` });
-  }
-
-  if (dias > DIAS_JANELA) {
-    out.push({ tom: 'mute', texto: 'Passou dos dois anos — pode arquivar' });
-  }
-  return out;
-}
+// Aplicam as regras compartilhadas ao estado carregado neste módulo.
+const marcoFeito = (pessoaId, key) => buscarMarco(marcos, pessoaId, key);
+const progresso  = (p) => calcProgresso(p, marcos);
+const alertas    = (p) => alertasDoCaminho(p, marcos, frequencias);
+const presencaEm = (pessoaId, domingo) => buscarPresenca(frequencias, pessoaId, domingo);
 
 /* ---------------------------------------------------------------------------
    Estrutura
@@ -182,7 +132,7 @@ function painelAcompanhamento() {
       'Cadastre os recém-conversos e quem está voltando à atividade.', '✨');
   }
 
-  const comAlerta = lista.filter(p => alertas(p).some(a => a.tom !== 'mute'));
+  const comAlerta = lista.filter(p => precisaDeAtencao(p, marcos, frequencias));
   const mediaProgresso = lista.length
     ? lista.reduce((t, p) => t + progresso(p).pct, 0) / lista.length : 0;
 

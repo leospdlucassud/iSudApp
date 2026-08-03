@@ -24,8 +24,9 @@ import {
 } from '../charts.js';
 import {
   comparaNome, dataCurta, deISO, domingoDaSemana, domingosDoAno, domingosDoMes,
-  hoje, num, soma, somaDias, variacao,
+  hoje, num, soma, variacao,
 } from '../util.js';
+import { novosNaSacramental } from '../regras.js';
 import { confirmar, el, modal, toast, vazio } from '../ui.js';
 
 const COL_SEM  = 'relatorio_semanal';
@@ -98,30 +99,13 @@ function valor(data, areaId, indKey, sub = 'total') {
     if (sub === 'homens')  return alcanca.filter(b => faixaEtaria(b.idade, b.sexo) === 'homens').length;
     if (sub === 'casados') return alcanca.filter(b => b.familia_completa).length;
   }
-  if (indKey === 'novos_sacramental') return novosNaSacramental(data, areaId);
+  if (indKey === 'novos_sacramental') {
+    return novosNaSacramental(data, areaId, caminhoPessoas, caminhoFrequencia);
+  }
 
   const r = linhaDe(data, areaId);
   const ind = INDICADORES.find(i => i.key === indKey);
   return num(r?.[chaveCampo(ind, sub)]);
-}
-
-/**
- * 6º indicador-chave do PMG 2023: membros novos que assistiram à sacramental.
- *
- * "Novo" é quem foi batizado nos últimos 12 meses contados do domingo em
- * questão — não de hoje, senão o histórico mudaria de valor com o tempo.
- * Sai do Caminho do Convênio, onde a presença já é registrada.
- */
-function novosNaSacramental(domingo, areaId) {
-  const limite = somaDias(domingo, -365);
-  const novos = caminhoPessoas.filter(p =>
-    p.tipo === 'recemConverso' &&
-    p.area_id === areaId &&
-    p.data_inicio > limite &&
-    p.data_inicio <= domingo);
-
-  return novos.filter(p => caminhoFrequencia.some(f =>
-    f.pessoa_id === p.id && f.domingo === domingo && f.presente)).length;
 }
 
 /** Consolidado da ala: soma das áreas ativas. Frequência jamais entra aqui. */

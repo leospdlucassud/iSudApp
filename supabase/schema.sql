@@ -261,6 +261,52 @@ create table if not exists public.caminho_frequencia (
 create index if not exists caminho_frequencia_domingo_idx
   on public.caminho_frequencia (domingo);
 
+-- -----------------------------------------------------------------------------
+-- Coordenação missionária — Manual Geral 23.4
+--
+-- A reunião é semanal e reúne as presidências da Sociedade de Socorro, do
+-- quórum de élderes e da Primária, representante das Moças, assistente do
+-- quórum de sacerdotes e os missionários de ala e de tempo integral.
+-- -----------------------------------------------------------------------------
+
+create table if not exists public.coordenacao_reunioes (
+  id           uuid primary key default gen_random_uuid(),
+  data         date not null unique,
+  observacoes  text,
+  criado_em    timestamptz not null default now()
+);
+
+create table if not exists public.coordenacao_presencas (
+  id          uuid primary key default gen_random_uuid(),
+  reuniao_id  uuid not null references public.coordenacao_reunioes(id) on delete cascade,
+  papel       text not null,
+  presente    boolean not null default true,
+  constraint coordenacao_presenca_unica unique (reuniao_id, papel)
+);
+
+-- reuniao_id fica nulo quando a designação nasce fora de uma reunião.
+create table if not exists public.coordenacao_designacoes (
+  id            uuid primary key default gen_random_uuid(),
+  reuniao_id    uuid references public.coordenacao_reunioes(id) on delete set null,
+  descricao     text not null check (char_length(descricao) between 3 and 500),
+  responsavel   text,
+  prazo         date,
+  concluida     boolean not null default false,
+  concluida_em  date,
+  criado_em     timestamptz not null default now()
+);
+
+create index if not exists designacoes_abertas_idx
+  on public.coordenacao_designacoes (concluida, prazo);
+
+-- Plano da ala para compartilhar o evangelho. Uma linha por seção.
+create table if not exists public.plano_ala (
+  id             uuid primary key default gen_random_uuid(),
+  secao          text not null unique,
+  texto          text,
+  atualizado_em  timestamptz not null default now()
+);
+
 -- =============================================================================
 -- RLS
 --
@@ -280,6 +326,10 @@ alter table public.progredindo           enable row level security;
 alter table public.caminho_pessoas       enable row level security;
 alter table public.caminho_marcos        enable row level security;
 alter table public.caminho_frequencia    enable row level security;
+alter table public.coordenacao_reunioes   enable row level security;
+alter table public.coordenacao_presencas  enable row level security;
+alter table public.coordenacao_designacoes enable row level security;
+alter table public.plano_ala              enable row level security;
 
 -- Recria as policies do zero para o script poder rodar de novo.
 do $$
@@ -292,7 +342,9 @@ begin
       and tablename in ('lideres','areas','voluntarios_almoco','almoco_agenda',
                         'disponibilidade_licoes','licoes_agenda','relatorio_semanal',
                         'frequencia_ala','batismos','progredindo',
-                        'caminho_pessoas','caminho_marcos','caminho_frequencia')
+                        'caminho_pessoas','caminho_marcos','caminho_frequencia',
+                        'coordenacao_reunioes','coordenacao_presencas',
+                        'coordenacao_designacoes','plano_ala')
   loop
     execute format('drop policy %I on %I.%I', p.policyname, p.schemaname, p.tablename);
   end loop;
@@ -367,6 +419,16 @@ create policy caminho_pessoas_tudo on public.caminho_pessoas
 create policy caminho_marcos_tudo on public.caminho_marcos
   for all using (public.eh_lider()) with check (public.eh_lider());
 create policy caminho_frequencia_tudo on public.caminho_frequencia
+  for all using (public.eh_lider()) with check (public.eh_lider());
+
+-- --- coordenação: reunião de liderança, nada disso é público -----------------
+create policy coord_reunioes_tudo on public.coordenacao_reunioes
+  for all using (public.eh_lider()) with check (public.eh_lider());
+create policy coord_presencas_tudo on public.coordenacao_presencas
+  for all using (public.eh_lider()) with check (public.eh_lider());
+create policy coord_designacoes_tudo on public.coordenacao_designacoes
+  for all using (public.eh_lider()) with check (public.eh_lider());
+create policy plano_ala_tudo on public.plano_ala
   for all using (public.eh_lider()) with check (public.eh_lider());
 
 -- =============================================================================
