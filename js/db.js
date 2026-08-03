@@ -26,13 +26,18 @@ export class ConflitoError extends Error {
   }
 }
 
-/** Chaves únicas por coleção. Espelham as constraints UNIQUE do Postgres. */
+/**
+ * Chaves únicas por coleção. Espelham as constraints UNIQUE do Postgres.
+ *
+ * Precisa estar completo: é daqui que sai o `onConflict` do upsert. Uma
+ * coleção esquecida aqui cai no insert simples e transforma uma duplicata
+ * inofensiva em erro na cara do usuário.
+ */
 const UNICOS = {
-  almoco_agenda:      ['data', 'area_id'],
-  licoes_agenda:      ['data', 'horario', 'area_id'],
-  relatorio_semanal:  ['data', 'area_id'],
-  frequencia_ala:     ['data'],
-  caminho_marcos:     ['pessoa_id', 'marco'],
+  almoco_agenda:     ['data', 'area_id'],
+  licoes_agenda:     ['data', 'horario', 'area_id'],
+  relatorio_semanal: ['data', 'area_id'],
+  frequencia_ala:    ['data'],
 };
 
 let backend = null;
@@ -92,6 +97,20 @@ function backendLocal() {
       gravar(colecao, linhas);
       avisar(colecao, true);
       return novo;
+    },
+
+    async inserirVarios(colecao, registros) {
+      const linhas = ler(colecao);
+      const novos = [];
+      for (const reg of registros) {
+        if (conflita(colecao, linhas, reg)) continue;
+        const novo = { id: uuid(), criado_em: new Date().toISOString(), ...reg };
+        linhas.push(novo);
+        novos.push(novo);
+      }
+      gravar(colecao, linhas);
+      avisar(colecao, true);
+      return novos;
     },
 
     async atualizar(colecao, id, patch) {
@@ -198,6 +217,26 @@ async function backendSupabase(url, anonKey) {
       return conferir(await sb.from(colecao).insert(reg).select().single());
     },
 
+    /**
+     * Grava um lote deixando passar o que já existe.
+     *
+     * Vira ON CONFLICT DO NOTHING, que exige apenas permissão de INSERT — o
+     * membro reenvia o formulário de disponibilidade sem tomar erro, mesmo
+     * sem poder ler nem atualizar o que já gravou.
+     *
+     * Sem `.select()` de propósito: pedir as linhas de volta exigiria também
+     * permissão de leitura, e numa tabela com telefone o anônimo não tem.
+     *
+     * Sem upsert também: resolver ON CONFLICT exige ler as linhas em conflito,
+     * o que o anônimo não pode. Coleções que aceitam lote não têm constraint
+     * de unicidade; a duplicata é tratada na leitura.
+     */
+    async inserirVarios(colecao, registros) {
+      if (!registros.length) return [];
+      conferir(await sb.from(colecao).insert(registros));
+      return registros;
+    },
+
     async atualizar(colecao, id, patch) {
       const resp = await sb.from(colecao).update(patch).eq('id', id).select();
       const linhas = conferir(resp);
@@ -293,8 +332,9 @@ export async function sair() {
   if (ehSupabase) await backend.sair();
 }
 
-export const listar    = (c, f)    => backend.listar(c, f);
-export const inserir   = (c, r)    => backend.inserir(c, r);
+export const listar        = (c, f)  => backend.listar(c, f);
+export const inserir       = (c, r)  => backend.inserir(c, r);
+export const inserirVarios = (c, rs) => backend.inserirVarios(c, rs);
 export const atualizar = (c, i, p) => backend.atualizar(c, i, p);
 export const remover   = (c, i)    => backend.remover(c, i);
 export const observar  = (c, cb)   => backend.observar(c, cb);

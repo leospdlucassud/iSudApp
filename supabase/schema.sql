@@ -100,6 +100,13 @@ create index if not exists almoco_agenda_data_idx on public.almoco_agenda (data)
 -- Lições com membros
 -- -----------------------------------------------------------------------------
 
+-- Sem constraint de unicidade, de propósito.
+--
+-- O membro grava mas não lê esta tabela (tem telefone), então reenviar o
+-- formulário é normal. Resolver ON CONFLICT exige permissão de leitura das
+-- linhas em conflito, que o anônimo não tem: com a constraint, o reenvio
+-- falhava com 42501. Linha repetida aqui é inofensiva e a leitura deduplica
+-- por (nome, modalidade, dia, horário).
 create table if not exists public.disponibilidade_licoes (
   id          uuid primary key default gen_random_uuid(),
   nome        text not null check (char_length(nome) between 2 and 120),
@@ -107,9 +114,14 @@ create table if not exists public.disponibilidade_licoes (
   modalidade  text not null,                 -- presencial | video
   dia         text not null,                 -- dom..sab
   horario     text not null,                 -- '19:00 - 20:00'
-  criado_em   timestamptz not null default now(),
-  constraint disponibilidade_unica unique (nome, modalidade, dia, horario)
+  criado_em   timestamptz not null default now()
 );
+
+alter table public.disponibilidade_licoes
+  drop constraint if exists disponibilidade_unica;
+
+create index if not exists disponibilidade_busca_idx
+  on public.disponibilidade_licoes (modalidade, dia, horario);
 
 create table if not exists public.licoes_agenda (
   id          uuid primary key default gen_random_uuid(),

@@ -518,6 +518,35 @@ a { color: var(--primary); }
 .table td.num { font-family: var(--font-num); text-align: right; font-variant-numeric: tabular-nums; }
 .table tfoot td { font-weight: 700; background: var(--surface-2); border-top: 2px solid var(--border-strong); }
 
+/* Grades de horário: célula compacta, alvo de toque ainda confortável. */
+.table--grade td { padding: .1875rem; }
+.table--grade th { font-size: .6875rem; }
+
+.slot, .densidade {
+  display: grid; place-items: center;
+  width: 100%; min-width: 2.75rem; height: 2.25rem;
+  border-radius: var(--r-sm);
+  font-size: .8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.slot {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: transparent;
+}
+.slot:hover { border-color: var(--primary); background: var(--surface-sunk); }
+.slot[aria-pressed="true"] {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  font-weight: 700;
+}
+
+.densidade { border: 1px solid transparent; font-weight: 600; }
+.densidade:not(:disabled):hover { border-color: var(--primary); }
+.densidade:disabled { cursor: default; }
+
 /* ==========================================================================
    Selos
    ========================================================================== */
