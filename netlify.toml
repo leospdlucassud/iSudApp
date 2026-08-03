@@ -1,6 +1,10 @@
 [build]
   publish = "."
-  command = ""
+  # Gera js/supabase-config.js a partir das variáveis de ambiente. O arquivo
+  # não é versionado porque o repositório é público. Sem as variáveis o build
+  # falha de propósito — publicar sem credenciais faria o app cair no
+  # localStorage e fingir que sincroniza.
+  command = "node scripts/gerar-config.cjs"
   ignore = "exit 1"
 
 # Cabeçalhos gerais. O app tem dados pessoais da ala: fora do índice dos

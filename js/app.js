@@ -158,6 +158,23 @@ function moduloDaURL() {
   return modulosVisiveis().some(m => m.id === id) ? id : INICIO;
 }
 
+/** Site publicado sem as credenciais do Supabase. */
+function telaSemConfiguracao() {
+  return el('div', {},
+    el('div', { class: 'page-head' },
+      el('h2', {}, '⚙️ App não configurado'),
+      el('p', {}, 'Este endereço não está ligado ao banco de dados, então nada seria compartilhado.'),
+    ),
+    el('div', { class: 'card' }, el('div', { class: 'card__body' },
+      el('p', { class: 'muted', style: 'margin-bottom:.75rem' },
+        'Se você é membro da ala, avise o líder de missão — o app volta assim que ele ajustar.'),
+      el('p', { class: 'small muted' },
+        'Para o LMA: defina SUPABASE_URL e SUPABASE_ANON_KEY nas variáveis de ambiente do ' +
+        'Netlify e publique de novo. O build gera js/supabase-config.js sozinho.'),
+    )),
+  );
+}
+
 /** Banco conectado, tabelas ainda não criadas. */
 function telaDeInstalacao() {
   return el('div', {},
@@ -189,6 +206,11 @@ async function montarModulo() {
 
   const alvo = $('#conteudo');
   alvo.replaceChildren(carregando());
+
+  if (db.faltaConfiguracao()) {
+    alvo.replaceChildren(telaSemConfiguracao());
+    return;
+  }
 
   if (!db.schemaPronto()) {
     alvo.replaceChildren(telaDeInstalacao());

@@ -228,6 +228,13 @@ async function backendSupabase(url, anonKey) {
    Interface pública
    ========================================================================== */
 
+/** Máquina de desenvolvimento, onde o modo local é aceitável. */
+const ehDesenvolvimento = () =>
+  ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) ||
+  location.protocol === 'file:';
+
+let semConfiguracao = false;
+
 export async function iniciar() {
   try {
     const cfg = await import('./supabase-config.js');
@@ -236,14 +243,23 @@ export async function iniciar() {
       ehSupabase = true;
     }
   } catch {
-    // Sem arquivo de configuração: segue no modo local.
+    // Sem arquivo de configuração.
   }
+
+  // Num site publicado, cair no localStorage é pior do que não abrir: o app
+  // pareceria funcionar e cada pessoa teria um calendário particular, sem
+  // ninguém perceber. Fora de desenvolvimento isso vira erro visível.
+  semConfiguracao = !ehSupabase && !ehDesenvolvimento();
+
   backend ??= backendLocal();
   await backend.iniciar();
   return backend.nome;
 }
 
 export const temBackend = () => ehSupabase;
+
+/** true quando o app está publicado mas sem credenciais do Supabase. */
+export const faltaConfiguracao = () => semConfiguracao;
 
 /** false quando o Supabase responde mas supabase/schema.sql ainda não rodou. */
 export const schemaPronto = () => !ehSupabase || backend.schemaOk;
