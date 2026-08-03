@@ -547,6 +547,48 @@ a { color: var(--primary); }
 .densidade:not(:disabled):hover { border-color: var(--primary); }
 .densidade:disabled { cursor: default; }
 
+/* Presença aos domingos: presente, faltou, sem registro. */
+.presenca {
+  display: grid; place-items: center;
+  width: 100%; min-width: 2.5rem; height: 2.25rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  font-size: .875rem; font-weight: 700;
+}
+.presenca--vazio { color: var(--text-3); }
+.presenca--vazio:hover { background: var(--surface-sunk); }
+.presenca--sim { background: var(--success-soft); border-color: var(--success); color: var(--success); }
+.presenca--nao { background: var(--danger-soft);  border-color: var(--danger);  color: var(--danger); }
+
+/* Barra de progresso do caminho do convênio */
+.barra {
+  height: .4375rem;
+  border-radius: var(--r-pill);
+  background: var(--surface-sunk);
+  overflow: hidden;
+  margin-bottom: .1875rem;
+}
+.barra__preenchida {
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--area-0);
+  transition: width .2s;
+}
+
+/* Item de marco na ficha individual */
+.marco {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .4375rem .5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: .875rem;
+  cursor: pointer;
+}
+.marco:hover { background: var(--surface-2); }
+.marco--feito { background: var(--success-soft); border-color: var(--success); }
+.marco__nome { flex: 1; }
+
 /* ==========================================================================
    Selos
    ========================================================================== */

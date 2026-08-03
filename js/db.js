@@ -34,10 +34,12 @@ export class ConflitoError extends Error {
  * inofensiva em erro na cara do usuário.
  */
 const UNICOS = {
-  almoco_agenda:     ['data', 'area_id'],
-  licoes_agenda:     ['data', 'horario', 'area_id'],
-  relatorio_semanal: ['data', 'area_id'],
-  frequencia_ala:    ['data'],
+  almoco_agenda:       ['data', 'area_id'],
+  licoes_agenda:       ['data', 'horario', 'area_id'],
+  relatorio_semanal:   ['data', 'area_id'],
+  frequencia_ala:      ['data'],
+  caminho_marcos:      ['pessoa_id', 'marco'],
+  caminho_frequencia:  ['pessoa_id', 'domingo'],
 };
 
 let backend = null;

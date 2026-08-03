@@ -209,6 +209,58 @@ create table if not exists public.progredindo (
 
 create index if not exists progredindo_data_idx on public.progredindo (data);
 
+-- -----------------------------------------------------------------------------
+-- Caminho do convênio
+--
+-- Acompanha recém-conversos e membros que voltam à atividade por DOIS anos,
+-- que é a janela do "Relatório de Progresso: No Caminho do Convênio". A ficha
+-- antiga da ala parava em um ano.
+--
+-- É o dado mais sensível do app: progresso espiritual de pessoas com nome e
+-- telefone. Nada aqui é legível por anônimo.
+-- -----------------------------------------------------------------------------
+
+create table if not exists public.caminho_pessoas (
+  id             uuid primary key default gen_random_uuid(),
+  nome           text not null check (char_length(nome) between 2 and 120),
+  tipo           text not null check (tipo in ('recemConverso', 'retornando')),
+  area_id        text references public.areas(id) on delete set null,
+  sexo           text check (sexo in ('m', 'f')),
+  -- Batismo, para recém-converso; volta à atividade, para quem retorna.
+  data_inicio    date not null,
+  telefone       text,
+  -- O Manual pede consentimento do membro que retorna antes de incluí-lo.
+  consentimento  boolean not null default false,
+  observacoes    text,
+  ativo          boolean not null default true,
+  criado_em      timestamptz not null default now()
+);
+
+create index if not exists caminho_pessoas_inicio_idx
+  on public.caminho_pessoas (data_inicio);
+
+create table if not exists public.caminho_marcos (
+  id          uuid primary key default gen_random_uuid(),
+  pessoa_id   uuid not null references public.caminho_pessoas(id) on delete cascade,
+  marco       text not null,
+  data        date,
+  observacao  text,
+  criado_em   timestamptz not null default now(),
+  constraint caminho_marco_unico unique (pessoa_id, marco)
+);
+
+-- A faixa "Domingos na Igreja" da ficha antiga.
+create table if not exists public.caminho_frequencia (
+  id          uuid primary key default gen_random_uuid(),
+  pessoa_id   uuid not null references public.caminho_pessoas(id) on delete cascade,
+  domingo     date not null,
+  presente    boolean not null default true,
+  constraint caminho_frequencia_unica unique (pessoa_id, domingo)
+);
+
+create index if not exists caminho_frequencia_domingo_idx
+  on public.caminho_frequencia (domingo);
+
 -- =============================================================================
 -- RLS
 --
@@ -225,6 +277,9 @@ alter table public.relatorio_semanal     enable row level security;
 alter table public.frequencia_ala        enable row level security;
 alter table public.batismos              enable row level security;
 alter table public.progredindo           enable row level security;
+alter table public.caminho_pessoas       enable row level security;
+alter table public.caminho_marcos        enable row level security;
+alter table public.caminho_frequencia    enable row level security;
 
 -- Recria as policies do zero para o script poder rodar de novo.
 do $$
@@ -236,7 +291,8 @@ begin
     where schemaname = 'public'
       and tablename in ('lideres','areas','voluntarios_almoco','almoco_agenda',
                         'disponibilidade_licoes','licoes_agenda','relatorio_semanal',
-                        'frequencia_ala','batismos','progredindo')
+                        'frequencia_ala','batismos','progredindo',
+                        'caminho_pessoas','caminho_marcos','caminho_frequencia')
   loop
     execute format('drop policy %I on %I.%I', p.policyname, p.schemaname, p.tablename);
   end loop;
@@ -303,6 +359,14 @@ create policy frequencia_tudo on public.frequencia_ala
 create policy batismos_tudo on public.batismos
   for all using (public.eh_lider()) with check (public.eh_lider());
 create policy progredindo_tudo on public.progredindo
+  for all using (public.eh_lider()) with check (public.eh_lider());
+
+-- --- caminho do convênio: o dado mais sensível do app ------------------------
+create policy caminho_pessoas_tudo on public.caminho_pessoas
+  for all using (public.eh_lider()) with check (public.eh_lider());
+create policy caminho_marcos_tudo on public.caminho_marcos
+  for all using (public.eh_lider()) with check (public.eh_lider());
+create policy caminho_frequencia_tudo on public.caminho_frequencia
   for all using (public.eh_lider()) with check (public.eh_lider());
 
 -- =============================================================================

@@ -24,7 +24,7 @@ import {
 } from '../charts.js';
 import {
   comparaNome, dataCurta, deISO, domingoDaSemana, domingosDoAno, domingosDoMes,
-  hoje, num, soma, variacao,
+  hoje, num, soma, somaDias, variacao,
 } from '../util.js';
 import { confirmar, el, modal, toast, vazio } from '../ui.js';
 
@@ -32,6 +32,8 @@ const COL_SEM  = 'relatorio_semanal';
 const COL_FREQ = 'frequencia_ala';
 const COL_BAT  = 'batismos';
 const COL_PROG = 'progredindo';
+const COL_CAM_PESSOAS = 'caminho_pessoas';
+const COL_CAM_FREQ    = 'caminho_frequencia';
 
 /** Indicadores que o LMA digita. O resto é derivado. */
 const MANUAIS = INDICADORES.filter(i => !i.derivado);
@@ -44,6 +46,7 @@ let areaSel = null;
 let indicadorGrafico = 'novas_pessoas';
 
 let areas = [], semanais = [], frequencias = [], batismos = [], progredindo = [];
+let caminhoPessoas = [], caminhoFrequencia = [];
 
 export async function montar(alvo, contexto) {
   ctx = contexto;
@@ -54,18 +57,22 @@ export async function montar(alvo, contexto) {
 }
 
 async function recarregar() {
-  const [as, sm, fq, bt, pr] = await Promise.all([
+  const [as, sm, fq, bt, pr, cp, cf] = await Promise.all([
     ctx.db.listar('areas'),
     ctx.db.listar(COL_SEM),
     ctx.db.listar(COL_FREQ),
     ctx.db.listar(COL_BAT),
     ctx.db.listar(COL_PROG),
+    ctx.db.listar(COL_CAM_PESSOAS),
+    ctx.db.listar(COL_CAM_FREQ),
   ]);
   areas = (as.length ? as : AREAS_PADRAO).filter(a => a.ativa !== false);
   semanais = sm;
   frequencias = fq;
   batismos = bt;
   progredindo = pr;
+  caminhoPessoas = cp;
+  caminhoFrequencia = cf;
 }
 
 /* ---------------------------------------------------------------------------
@@ -91,16 +98,34 @@ function valor(data, areaId, indKey, sub = 'total') {
     if (sub === 'homens')  return alcanca.filter(b => faixaEtaria(b.idade, b.sexo) === 'homens').length;
     if (sub === 'casados') return alcanca.filter(b => b.familia_completa).length;
   }
-  if (indKey === 'novos_sacramental') return null; // vem do Caminho do Convênio
+  if (indKey === 'novos_sacramental') return novosNaSacramental(data, areaId);
 
   const r = linhaDe(data, areaId);
   const ind = INDICADORES.find(i => i.key === indKey);
   return num(r?.[chaveCampo(ind, sub)]);
 }
 
+/**
+ * 6º indicador-chave do PMG 2023: membros novos que assistiram à sacramental.
+ *
+ * "Novo" é quem foi batizado nos últimos 12 meses contados do domingo em
+ * questão — não de hoje, senão o histórico mudaria de valor com o tempo.
+ * Sai do Caminho do Convênio, onde a presença já é registrada.
+ */
+function novosNaSacramental(domingo, areaId) {
+  const limite = somaDias(domingo, -365);
+  const novos = caminhoPessoas.filter(p =>
+    p.tipo === 'recemConverso' &&
+    p.area_id === areaId &&
+    p.data_inicio > limite &&
+    p.data_inicio <= domingo);
+
+  return novos.filter(p => caminhoFrequencia.some(f =>
+    f.pessoa_id === p.id && f.domingo === domingo && f.presente)).length;
+}
+
 /** Consolidado da ala: soma das áreas ativas. Frequência jamais entra aqui. */
 function valorAla(data, indKey, sub = 'total') {
-  if (indKey === 'novos_sacramental') return null;
   return soma(areas, a => valor(data, a.id, indKey, sub));
 }
 
@@ -118,6 +143,7 @@ const semanaTemDados = (d) =>
   semanais.some(r => r.data === d) ||
   frequencias.some(f => f.data === d) ||
   progredindo.some(p => p.data === d) ||
+  caminhoFrequencia.some(f => f.domingo === d) ||
   batismos.some(b => [b.data_batismo, b.data_confirmacao].some(x => x && domingoDaSemana(x) === d));
 
 /**
@@ -235,12 +261,13 @@ function painelLancamento() {
               el('td', { class: 'num' }, n(valor(d, area.id, 'progredindo'))),
               el('td', { class: 'num' }, n(valor(d, area.id, 'batismos'))),
               el('td', { class: 'num' }, n(valor(d, area.id, 'confirmacoes'))),
-              el('td', { class: 'num muted' }, '—'),
+              el('td', { class: 'num' }, n(valor(d, area.id, 'novos_sacramental'))),
             ))),
           )),
         el('p', { class: 'small muted', style: 'margin-top:.75rem' },
-          'Progredindo vem da aba Progredindo; batismos e confirmações, da aba Batismos. ' +
-          'Membros novos na sacramental é o 6º indicador-chave do PMG e virá do Caminho do Convênio.'),
+          'Progredindo vem da aba Progredindo; batismos e confirmações, da aba Batismos; ' +
+          'membros novos na sacramental vem do Caminho do Convênio, contando quem foi ' +
+          'batizado nos 12 meses anteriores àquele domingo e teve presença marcada.'),
       )),
   );
 }
@@ -335,8 +362,7 @@ function painelConsolidado() {
   const rodape = el('tr', {}, el('td', {}, 'Total do mês'));
   for (const ind of INDICADORES) {
     for (const sub of (ind.split ? SUBCAMPOS.map(s => s.key) : ['total'])) {
-      const v = ind.key === 'novos_sacramental' ? null : soma(domingos, d => valorAla(d, ind.key, sub) ?? 0);
-      rodape.append(el('td', { class: 'num' }, v == null ? '—' : n(v)));
+      rodape.append(el('td', { class: 'num' }, n(soma(domingos, d => valorAla(d, ind.key, sub)))));
     }
   }
   // Frequência não soma: a média do mês é a leitura que faz sentido.
@@ -366,10 +392,8 @@ function painelConsolidado() {
             ...INDICADORES.map(i => el('th', { class: 'center', title: i.label }, i.abbr)))),
           el('tbody', {}, ...areas.map(a => el('tr', {},
             el('td', {}, el('span', { class: 'dot', style: `background:${corDaArea(a.cor ?? 0)};margin-right:.5rem` }), a.nome),
-            ...INDICADORES.map(i => {
-              const v = i.key === 'novos_sacramental' ? null : soma(domingos, d => valor(d, a.id, i.key));
-              return el('td', { class: v == null ? 'num muted' : 'num' }, v == null ? '—' : n(v));
-            }),
+            ...INDICADORES.map(i =>
+              el('td', { class: 'num' }, n(soma(domingos, d => valor(d, a.id, i.key))))),
           ))),
         )),
     ),
@@ -433,8 +457,7 @@ function painelGraficos() {
       ...MESES.map((m, i) => el('option', { value: i, selected: i === mes }, m))),
     el('span', { class: 'small muted', style: 'margin-left:.75rem' }, 'Indicador:'),
     el('select', { class: 'select', style: 'max-width:16rem', onchange: (e) => { indicadorGrafico = e.target.value; pintar(); } },
-      ...INDICADORES.filter(i => i.key !== 'novos_sacramental')
-        .map(i => el('option', { value: i.key, selected: i.key === indicadorGrafico }, i.label))),
+      ...INDICADORES.map(i => el('option', { value: i.key, selected: i.key === indicadorGrafico }, i.label))),
   );
 
   return el('div', {},
@@ -452,19 +475,13 @@ function cartoesChave(doMes, doMesAnterior, domingosAno) {
 
   return el('div', { class: 'grid grid--kpi', style: 'margin-bottom:1rem' },
     ...INDICADORES_CHAVE.map((ind, i) => {
-      if (ind.key === 'novos_sacramental') {
-        return cartaoIndicador({
-          rotulo: `${ind.pmg}. ${ind.label}`, valor: 0, variacao: null,
-          nota: 'aguarda o Caminho do Convênio', cor: corDaArea(i),
-        });
-      }
       const atual = totalNoPeriodo(doMes, ind.key);
       const antes = totalNoPeriodo(doMesAnterior, ind.key);
       return cartaoIndicador({
         rotulo: `${ind.pmg}. ${ind.label}`,
         valor: atual,
         variacao: variacao(antes, atual),
-        serie: ultimos12.map(d => valorAla(d, ind.key) ?? 0),
+        serie: ultimos12.map(d => valorAla(d, ind.key)),
         cor: corDaArea(i),
       });
     }),
