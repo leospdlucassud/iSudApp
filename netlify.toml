@@ -3,16 +3,33 @@
   command = ""
   ignore = "exit 1"
 
-[build.environment]
-  NETLIFY_SKIP_PYTHON_DEPENDENCY_INSTALL = "true"
+# Cabeçalhos gerais. O app tem dados pessoais da ala: fora do índice dos
+# buscadores e sem referrer para fora.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "no-referrer"
+    X-Robots-Tag = "noindex, nofollow"
+    Permissions-Policy = "geolocation=(), camera=(), microphone=(), interest-cohort=()"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://esm.sh; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://esm.sh https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'none'"
 
 [[headers]]
   for = "/index.html"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
-    X-Content-Type-Options = "nosniff"
-    X-Frame-Options = "DENY"
-    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Sem hash no nome dos arquivos, então o service worker é quem guarda offline.
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/css/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
 
 [[headers]]
   for = "/manifest.json"
@@ -31,6 +48,8 @@
   [headers.values]
     Cache-Control = "public, max-age=604800"
 
+# Só as rotas desconhecidas caem no index; arquivos existentes são servidos
+# normalmente, então os módulos ES continuam funcionando.
 [[redirects]]
   from = "/*"
   to = "/index.html"

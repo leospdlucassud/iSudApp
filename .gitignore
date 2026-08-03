@@ -1,17 +1,19 @@
-# Ignorar o desktop.ini
 desktop.ini
-/static/js/desktop.ini
-
-# Ignorar arquivos de log
 *.log
-
-# Ignorar diretórios específicos
-/node_modules/
-/dist/
-
-# Ignorar arquivos temporários
 *.tmp
 *.swp
 
-# Ignorar diretório do Claude Code (worktrees e configs locais)
+/node_modules/
+/dist/
+
 .claude/
+
+# Credenciais do Supabase — nunca versionar.
+js/supabase-config.js
+
+# Dados pessoais da ala: planilhas de origem e scripts de carga inicial.
+# O repositório é público; nada com nome, telefone ou endereço entra aqui.
+/planilhas/
+/seed/
+*.xlsx
+*.xlsm
