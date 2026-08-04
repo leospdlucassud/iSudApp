@@ -297,17 +297,17 @@ function campoNumero({ valor: v, rotulo, aoSalvar }) {
   return inp;
 }
 
+// Gravam pela chave única numa operação só. Decidir entre inserir e atualizar
+// no cliente abria uma janela: dois campos preenchidos em sequência rápida
+// numa semana ainda inexistente disparavam dois INSERT, e o segundo perdia o
+// valor digitado com erro de unicidade.
 async function salvarSemanal(data, areaId, campo, v) {
-  const existente = linhaDe(data, areaId);
-  if (existente) await ctx.db.atualizar(COL_SEM, existente.id, { [campo]: v });
-  else           await ctx.db.inserir(COL_SEM, { data, area_id: areaId, [campo]: v });
+  await ctx.db.gravarNaChave(COL_SEM, { data, area_id: areaId, [campo]: v });
   await recarregar();
 }
 
 async function salvarFrequencia(data, v) {
-  const existente = frequencias.find(f => f.data === data);
-  if (existente) await ctx.db.atualizar(COL_FREQ, existente.id, { valor: v });
-  else           await ctx.db.inserir(COL_FREQ, { data, valor: v });
+  await ctx.db.gravarNaChave(COL_FREQ, { data, valor: v });
   await recarregar();
 }
 

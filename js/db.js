@@ -65,8 +65,8 @@ function backendLocal() {
   const canal = 'BroadcastChannel' in self ? new BroadcastChannel('om_sync') : null;
   const ouvintes = new Map(); // coleção -> Set<callback>
 
-  const ler    = (c) => { try { return JSON.parse(localStorage.getItem(PREFIXO + c)) ?? []; } catch { return []; } };
-  const gravar = (c, linhas) => localStorage.setItem(PREFIXO + c, JSON.stringify(linhas));
+  const ler     = (c) => { try { return JSON.parse(localStorage.getItem(PREFIXO + c)) ?? []; } catch { return []; } };
+  const escrever = (c, linhas) => localStorage.setItem(PREFIXO + c, JSON.stringify(linhas));
 
   const avisar = (colecao, local) => {
     ouvintes.get(colecao)?.forEach(fn => fn());
@@ -100,7 +100,7 @@ function backendLocal() {
       if (conflita(colecao, linhas, reg)) throw new ConflitoError();
       const novo = { id: uuid(), criado_em: new Date().toISOString(), ...reg };
       linhas.push(novo);
-      gravar(colecao, linhas);
+      escrever(colecao, linhas);
       avisar(colecao, true);
       return novo;
     },
@@ -114,7 +114,7 @@ function backendLocal() {
         linhas.push(novo);
         novos.push(novo);
       }
-      gravar(colecao, linhas);
+      escrever(colecao, linhas);
       avisar(colecao, true);
       return novos;
     },
@@ -126,13 +126,25 @@ function backendLocal() {
       const atualizado = { ...linhas[i], ...patch };
       if (conflita(colecao, linhas, atualizado, id)) throw new ConflitoError();
       linhas[i] = atualizado;
-      gravar(colecao, linhas);
+      escrever(colecao, linhas);
       avisar(colecao, true);
       return atualizado;
     },
 
+    async gravarNaChave(colecao, reg) {
+      const campos = UNICOS[colecao];
+      if (!campos) return this.inserir(colecao, reg);
+      const linhas = ler(colecao);
+      const i = linhas.findIndex(l => campos.every(c => l[c] === reg[c]));
+      if (i < 0) return this.inserir(colecao, reg);
+      linhas[i] = { ...linhas[i], ...reg };
+      escrever(colecao, linhas);
+      avisar(colecao, true);
+      return linhas[i];
+    },
+
     async remover(colecao, id) {
-      gravar(colecao, ler(colecao).filter(l => l.id !== id));
+      escrever(colecao, ler(colecao).filter(l => l.id !== id));
       avisar(colecao, true);
     },
 
@@ -269,6 +281,31 @@ async function backendSupabase(url, anonKey) {
       return registros;
     },
 
+    /**
+     * Grava pela chave única, numa operação só.
+     *
+     * Existe para não decidir no cliente entre inserir e atualizar: entre a
+     * leitura e a gravação cabe uma ida ao banco, e dois campos preenchidos em
+     * sequência rápida numa linha ainda inexistente disparavam dois INSERT —
+     * o segundo morria com 23505 e o valor digitado se perdia.
+     *
+     * Vira ON CONFLICT DO UPDATE apenas nas colunas enviadas, então gravar um
+     * campo não apaga os outros da mesma linha.
+     *
+     * Exige que a carga traga toda coluna NOT NULL que não tenha default: o
+     * Postgres monta a linha proposta e valida as restrições ANTES de resolver
+     * o conflito, então omitir uma dessas colunas falha mesmo quando a linha
+     * já existe e o caminho seria de update. Vale para relatorio_semanal e
+     * frequencia_ala, onde tudo fora da chave tem default 0.
+     */
+    async gravarNaChave(colecao, reg) {
+      const campos = UNICOS[colecao];
+      if (!campos) return this.inserir(colecao, reg);
+      return conferir(await sb.from(colecao)
+        .upsert(reg, { onConflict: campos.join(',') })
+        .select().single());
+    },
+
     async atualizar(colecao, id, patch) {
       const resp = await sb.from(colecao).update(patch).eq('id', id).select();
       const linhas = conferir(resp);
@@ -380,6 +417,9 @@ export async function sair() {
 export const listar        = (c, f)  => backend.listar(c, f);
 export const inserir       = (c, r)  => backend.inserir(c, r);
 export const inserirVarios = (c, rs) => backend.inserirVarios(c, rs);
+
+/** Insere ou atualiza pela chave única, atomicamente. */
+export const gravarNaChave = (c, r) => backend.gravarNaChave(c, r);
 export const atualizar = (c, i, p) => backend.atualizar(c, i, p);
 export const remover   = (c, i)    => backend.remover(c, i);
 export const observar  = (c, cb)   => backend.observar(c, cb);

@@ -34,12 +34,22 @@ function s(tag, attrs = {}, ...filhos) {
   return node;
 }
 
-/** Escala "bonita": teto arredondado e passo legível. */
+/**
+ * Escala "bonita": teto arredondado e passo legível.
+ *
+ * O passo é sempre inteiro porque tudo que este app plota é contagem de
+ * pessoas, lições ou batismos. Com passo fracionário, um máximo de 1 gerava
+ * degraus de 0,25 e o eixo Y saía "0, 0, 1, 1, 1" depois do arredondamento —
+ * com as linhas de grade em posições que não correspondiam aos números
+ * impressos. Máximos 1 e 2 são justamente os mais comuns em Batismos e Novos
+ * com Data.
+ */
 function escala(max, alvoLinhas = 4) {
   if (max <= 0) return { topo: 1, passo: 1 };
   const bruto = max / alvoLinhas;
   const mag = 10 ** Math.floor(Math.log10(bruto));
-  const passo = [1, 2, 2.5, 5, 10].map(m => m * mag).find(p => p >= bruto) ?? 10 * mag;
+  const bruto2 = [1, 2, 5, 10].map(m => m * mag).find(p => p >= bruto) ?? 10 * mag;
+  const passo = Math.max(1, Math.round(bruto2));
   return { topo: Math.ceil(max / passo) * passo, passo };
 }
 

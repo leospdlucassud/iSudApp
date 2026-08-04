@@ -134,8 +134,55 @@ create table if not exists public.disponibilidade_licoes (
 alter table public.disponibilidade_licoes
   drop constraint if exists disponibilidade_unica;
 
+-- Sem unicidade, o domínio é o que impede lixo. `not valid` deixa as linhas
+-- já existentes em paz e passa a exigir das novas.
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'disponibilidade_dia_valido') then
+    alter table public.disponibilidade_licoes
+      add constraint disponibilidade_dia_valido
+      check (dia in ('dom','seg','ter','qua','qui','sex','sab')) not valid;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'disponibilidade_modalidade_valida') then
+    alter table public.disponibilidade_licoes
+      add constraint disponibilidade_modalidade_valida
+      check (modalidade in ('presencial','video')) not valid;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'disponibilidade_horario_valido') then
+    alter table public.disponibilidade_licoes
+      add constraint disponibilidade_horario_valido
+      check (horario in (
+        '10:30 - 11:30','14:00 - 15:00','15:00 - 16:00','16:00 - 17:00',
+        '17:00 - 18:00','18:00 - 19:00','19:00 - 20:00','20:00 - 21:00'
+      )) not valid;
+  end if;
+end $$;
+
 create index if not exists disponibilidade_busca_idx
   on public.disponibilidade_licoes (modalidade, dia, horario);
+
+create index if not exists disponibilidade_nome_idx
+  on public.disponibilidade_licoes (lower(nome));
+
+-- Teto por pessoa. Como a tabela não tem unicidade, reenviar o formulário
+-- acrescenta linhas; sem limite, um laço de repetição encheria a tabela.
+-- 112 é o máximo que faz sentido (7 dias × 8 faixas × 2 modalidades), então
+-- 500 dá folga para alguns reenvios e ainda limita.
+create or replace function public.disponibilidade_sob_limite(p_nome text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select (
+    select count(*) from public.disponibilidade_licoes
+    where lower(nome) = lower(coalesce(p_nome, ''))
+  ) < 500;
+$$;
+
+revoke all on function public.disponibilidade_sob_limite(text) from public;
+grant execute on function public.disponibilidade_sob_limite(text) to anon, authenticated;
 
 create table if not exists public.licoes_agenda (
   id          uuid primary key default gen_random_uuid(),
@@ -389,10 +436,18 @@ create policy voluntarios_tudo on public.voluntarios_almoco
 create policy almoco_leitura on public.almoco_agenda
   for select using (true);
 
--- Criar: qualquer pessoa com o link, mas só para hoje em diante.
--- O líder escapa da trava de data porque precisa acertar o passado.
+-- Criar: qualquer pessoa com o link, de hoje até um ano à frente.
+--
+-- O teto não é decoração. Sem ele, qualquer um com o link podia gravar datas
+-- arbitrariamente distantes — dez anos de calendário são ~14.600 linhas — e,
+-- como anônimo não tem DELETE, só o LMA conseguiria limpar, uma a uma.
+--
+-- O líder escapa das duas travas porque precisa acertar o passado.
 create policy almoco_reserva on public.almoco_agenda
-  for insert with check (data >= current_date or public.eh_lider());
+  for insert with check (
+    public.eh_lider()
+    or (data >= current_date and data <= current_date + interval '1 year')
+  );
 
 -- Alterar e apagar: só o LMA. É o "uma vez gravada, só o admin altera".
 create policy almoco_ajuste on public.almoco_agenda
@@ -405,8 +460,12 @@ create policy almoco_remocao on public.almoco_agenda
 -- O membro cadastra a própria disponibilidade sem precisar ver a dos outros.
 create policy disp_leitura on public.disponibilidade_licoes
   for select using (public.eh_lider());
+-- Aceitava qualquer coisa. Agora o domínio vem das constraints da tabela e o
+-- volume por pessoa vem daqui. Continua sendo possível a alguém com o link
+-- cadastrar muitos nomes diferentes — isso é inerente ao modelo de link
+-- aberto, e o que dá para limitar barato está limitado.
 create policy disp_cadastro on public.disponibilidade_licoes
-  for insert with check (true);
+  for insert with check (public.eh_lider() or public.disponibilidade_sob_limite(nome));
 
 -- --- agenda das lições: pública como a do almoço ------------------------------
 create policy disp_ajuste on public.disponibilidade_licoes
@@ -417,7 +476,10 @@ create policy disp_remocao on public.disponibilidade_licoes
 create policy licoes_leitura on public.licoes_agenda
   for select using (true);
 create policy licoes_reserva on public.licoes_agenda
-  for insert with check (data >= current_date or public.eh_lider());
+  for insert with check (
+    public.eh_lider()
+    or (data >= current_date and data <= current_date + interval '1 year')
+  );
 create policy licoes_ajuste on public.licoes_agenda
   for update using (public.eh_lider()) with check (public.eh_lider());
 create policy licoes_remocao on public.licoes_agenda
