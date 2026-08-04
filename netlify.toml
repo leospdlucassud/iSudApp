@@ -17,7 +17,8 @@
     Referrer-Policy = "no-referrer"
     X-Robots-Tag = "noindex, nofollow"
     Permissions-Policy = "geolocation=(), camera=(), microphone=(), interest-cohort=()"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://esm.sh; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://esm.sh https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'none'"
+    # Sem CDN de terceiro: o cliente Supabase é servido de js/vendor/.
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'none'"
 
 [[headers]]
   for = "/index.html"
@@ -29,6 +30,12 @@
   for = "/js/*"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
+
+# Biblioteca de terceiro, só muda quando atualizamos a versão de propósito.
+[[headers]]
+  for = "/js/vendor/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
 
 [[headers]]
   for = "/css/*"

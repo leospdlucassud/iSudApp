@@ -148,8 +148,34 @@ function backendLocal() {
    Backend Supabase
    ========================================================================== */
 
+/**
+ * Carrega o cliente Supabase de js/vendor/supabase.js.
+ *
+ * Era um import de CDN em tempo de execução, e isso quebrava para quem usa
+ * bloqueador de conteúdo — o Brave, por exemplo, barra o esm.sh com o escudo
+ * ligado, e o app caía no modo local sem avisar. Numa ala com centenas de
+ * celulares e bloqueadores variados, depender de terceiro para carregar não é
+ * aceitável. O arquivo é o build UMD oficial, versionado junto com o app.
+ */
+async function carregarClienteSupabase() {
+  if (globalThis.supabase?.createClient) return globalThis.supabase.createClient;
+
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = '/js/vendor/supabase.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Não foi possível carregar a biblioteca do Supabase.'));
+    document.head.append(s);
+  });
+
+  if (!globalThis.supabase?.createClient) {
+    throw new Error('A biblioteca do Supabase carregou incompleta.');
+  }
+  return globalThis.supabase.createClient;
+}
+
 async function backendSupabase(url, anonKey) {
-  const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+  const createClient = await carregarClienteSupabase();
   const sb = createClient(url, anonKey, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     realtime: { params: { eventsPerSecond: 5 } },
@@ -279,22 +305,32 @@ const ehDesenvolvimento = () =>
   location.protocol === 'file:';
 
 let semConfiguracao = false;
+let falhaAoConectar = null;
 
 export async function iniciar() {
+  let cfg = null;
   try {
-    const cfg = await import('./supabase-config.js');
-    if (cfg?.URL && cfg?.ANON_KEY) {
-      backend = await backendSupabase(cfg.URL, cfg.ANON_KEY);
-      ehSupabase = true;
-    }
+    cfg = await import('./supabase-config.js');
   } catch {
-    // Sem arquivo de configuração.
+    // Sem arquivo de configuração: é o caso de "ainda não configurado".
   }
 
-  // Num site publicado, cair no localStorage é pior do que não abrir: o app
-  // pareceria funcionar e cada pessoa teria um calendário particular, sem
-  // ninguém perceber. Fora de desenvolvimento isso vira erro visível.
-  semConfiguracao = !ehSupabase && !ehDesenvolvimento();
+  if (cfg?.URL && cfg?.ANON_KEY) {
+    try {
+      backend = await backendSupabase(cfg.URL, cfg.ANON_KEY);
+      ehSupabase = true;
+    } catch (err) {
+      // Distinguir isto de "sem configuração" é o ponto: aqui as credenciais
+      // EXISTEM e mesmo assim não deu para conectar — biblioteca bloqueada por
+      // um escudo de navegador, rede fora, projeto pausado. Cair no localStorage
+      // calado faria cada pessoa ter um calendário particular sem perceber.
+      falhaAoConectar = err?.message || 'Falha ao conectar no banco de dados.';
+      console.error('[db] Supabase indisponível:', err);
+    }
+  } else {
+    // Num site publicado, faltar configuração é erro; em desenvolvimento, não.
+    semConfiguracao = !ehDesenvolvimento();
+  }
 
   backend ??= backendLocal();
   await backend.iniciar();
@@ -305,6 +341,9 @@ export const temBackend = () => ehSupabase;
 
 /** true quando o app está publicado mas sem credenciais do Supabase. */
 export const faltaConfiguracao = () => semConfiguracao;
+
+/** Mensagem quando há credenciais mas a conexão falhou. `null` se está tudo bem. */
+export const erroDeConexao = () => falhaAoConectar;
 
 /** false quando o Supabase responde mas supabase/schema.sql ainda não rodou. */
 export const schemaPronto = () => !ehSupabase || backend.schemaOk;

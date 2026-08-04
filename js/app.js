@@ -158,6 +158,27 @@ function moduloDaURL() {
   return modulosVisiveis().some(m => m.id === id) ? id : INICIO;
 }
 
+/** Credenciais existem, mas não deu para conectar. */
+function telaSemConexao() {
+  return el('div', {},
+    el('div', { class: 'page-head' },
+      el('h2', {}, '📡 Sem conexão com o banco de dados'),
+      el('p', {}, 'O app não conseguiu conectar, então nada seria compartilhado com a ala.'),
+    ),
+    el('div', { class: 'card' }, el('div', { class: 'card__body' },
+      el('p', { style: 'margin-bottom:.75rem' }, 'O motivo mais comum é um bloqueador de conteúdo.'),
+      el('ul', { style: 'padding-left:1.125rem;display:grid;gap:.5rem;margin-bottom:1rem' },
+        el('li', { class: 'small' }, 'No Brave, toque no escudo ao lado do endereço e desative para este site.'),
+        el('li', { class: 'small' }, 'Em outros navegadores, verifique extensões de bloqueio de anúncios.'),
+        el('li', { class: 'small' }, 'Se estiver sem internet, o app volta sozinho quando ela voltar.'),
+      ),
+      el('button', { class: 'btn btn--primary', type: 'button', onclick: () => location.reload() },
+        'Tentar de novo'),
+      el('p', { class: 'small muted', style: 'margin-top:1rem' }, db.erroDeConexao()),
+    )),
+  );
+}
+
 /** Site publicado sem as credenciais do Supabase. */
 function telaSemConfiguracao() {
   return el('div', {},
@@ -206,6 +227,11 @@ async function montarModulo() {
 
   const alvo = $('#conteudo');
   alvo.replaceChildren(carregando());
+
+  if (db.erroDeConexao()) {
+    alvo.replaceChildren(telaSemConexao());
+    return;
+  }
 
   if (db.faltaConfiguracao()) {
     alvo.replaceChildren(telaSemConfiguracao());

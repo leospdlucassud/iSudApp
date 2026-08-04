@@ -6,7 +6,7 @@
  * pior do que erro de conexão.
  */
 
-const CACHE = 'om-v4';
+const CACHE = 'om-v5';
 
 const CASCA = [
   '/',
@@ -16,8 +16,10 @@ const CASCA = [
   '/js/app.js',
   '/js/config.js',
   '/js/db.js',
+  '/js/regras.js',
   '/js/ui.js',
   '/js/util.js',
+  '/js/vendor/supabase.js',
   '/js/modules/inicio.js',
   '/icons/icon.svg',
   '/icons/icon-192.png',
@@ -61,19 +63,22 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Estáticos: cache primeiro, revalidando em segundo plano.
+  // Estáticos: rede primeiro, cache como rede de segurança.
+  //
+  // Já foi cache-first, e isso fazia cada publicação chegar só na SEGUNDA
+  // visita — a pessoa abria o app, via a versão antiga e concluía que o deploy
+  // não tinha funcionado. Num app que ainda muda toda semana, servir o atual
+  // vale mais do que economizar um pedido; o cache continua garantindo o
+  // funcionamento offline.
   e.respondWith(
-    caches.match(request).then((emCache) => {
-      const daRede = fetch(request)
-        .then((r) => {
-          if (r.ok) {
-            const copia = r.clone();
-            caches.open(CACHE).then(c => c.put(request, copia));
-          }
-          return r;
-        })
-        .catch(() => emCache);
-      return emCache || daRede;
-    }),
+    fetch(request)
+      .then((r) => {
+        if (r.ok) {
+          const copia = r.clone();
+          caches.open(CACHE).then(c => c.put(request, copia));
+        }
+        return r;
+      })
+      .catch(() => caches.match(request)),
   );
 });
