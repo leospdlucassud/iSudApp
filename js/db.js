@@ -93,6 +93,10 @@ function backendLocal() {
 
     async inserir(colecao, reg) {
       const linhas = ler(colecao);
+      // A chave primária também é uma restrição de unicidade. Sem isto, o
+      // backend local aceitaria o mesmo `id` duas vezes e a restauração de um
+      // backup duplicaria tudo — o Postgres recusaria.
+      if (reg.id != null && linhas.some(l => l.id === reg.id)) throw new ConflitoError();
       if (conflita(colecao, linhas, reg)) throw new ConflitoError();
       const novo = { id: uuid(), criado_em: new Date().toISOString(), ...reg };
       linhas.push(novo);

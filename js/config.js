@@ -21,11 +21,17 @@ export const ALA = {
    consolidado da ala é a soma das áreas ativas.
 --------------------------------------------------------------------------- */
 
+/**
+ * Áreas de partida. Servem de fallback de EXIBIÇÃO enquanto a tabela `areas`
+ * estiver vazia, para o app não abrir quebrado antes da configuração — mas
+ * elas não existem no banco. Em Configurações a lista mostra o que está
+ * gravado de verdade, com um botão para criar estas.
+ */
 export const AREAS_PADRAO = [
-  { id: 'queimados',   nome: 'Queimados',     cor: 0, ativa: true },
-  { id: 'jardins',     nome: 'Jardins',       cor: 1, ativa: true },
-  { id: 'engPedreira', nome: 'Eng. Pedreira', cor: 2, ativa: true },
-  { id: 'paracambi',   nome: 'Paracambí',     cor: 3, ativa: true },
+  { id: 'queimados',   nome: 'Queimados',     cor: 0, ordem: 1, ativa: true },
+  { id: 'jardins',     nome: 'Jardins',       cor: 1, ordem: 2, ativa: true },
+  { id: 'engPedreira', nome: 'Eng. Pedreira', cor: 2, ordem: 3, ativa: true },
+  { id: 'paracambi',   nome: 'Paracambí',     cor: 3, ordem: 4, ativa: true },
 ];
 
 /** Slot categórico fixo. A cor segue a entidade, nunca a posição na lista. */

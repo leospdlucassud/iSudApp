@@ -64,6 +64,20 @@ insert into public.areas (id, nome, cor, ordem) values
   ('paracambi',   'Paracambí',     3, 4)
 on conflict (id) do nothing;
 
+-- Duplas de missionários por área e mês — os nomes que apareciam no cabeçalho
+-- de cada bloco da planilha. Leitura pública para o calendário poder mostrar
+-- quem o voluntário vai receber.
+create table if not exists public.duplas_missionarios (
+  id             uuid primary key default gen_random_uuid(),
+  area_id        text not null references public.areas(id) on delete cascade,
+  ano            smallint not null,
+  mes            smallint not null check (mes between 1 and 12),
+  missionario_1  text,
+  missionario_2  text,
+  atualizado_em  timestamptz not null default now(),
+  constraint dupla_unica unique (area_id, ano, mes)
+);
+
 -- -----------------------------------------------------------------------------
 -- Almoço
 -- -----------------------------------------------------------------------------
@@ -315,6 +329,7 @@ create table if not exists public.plano_ala (
 
 alter table public.lideres               enable row level security;
 alter table public.areas                 enable row level security;
+alter table public.duplas_missionarios   enable row level security;
 alter table public.voluntarios_almoco    enable row level security;
 alter table public.almoco_agenda         enable row level security;
 alter table public.disponibilidade_licoes enable row level security;
@@ -339,7 +354,7 @@ begin
     select schemaname, tablename, policyname
     from pg_policies
     where schemaname = 'public'
-      and tablename in ('lideres','areas','voluntarios_almoco','almoco_agenda',
+      and tablename in ('lideres','areas','duplas_missionarios','voluntarios_almoco','almoco_agenda',
                         'disponibilidade_licoes','licoes_agenda','relatorio_semanal',
                         'frequencia_ala','batismos','progredindo',
                         'caminho_pessoas','caminho_marcos','caminho_frequencia',
@@ -358,6 +373,11 @@ create policy lideres_leitura on public.lideres
 create policy areas_leitura on public.areas
   for select using (true);
 create policy areas_escrita on public.areas
+  for all using (public.eh_lider()) with check (public.eh_lider());
+
+create policy duplas_leitura on public.duplas_missionarios
+  for select using (true);
+create policy duplas_escrita on public.duplas_missionarios
   for all using (public.eh_lider()) with check (public.eh_lider());
 
 -- --- voluntários: tem telefone e endereço, então NÃO é público ----------------

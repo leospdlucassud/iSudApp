@@ -589,6 +589,26 @@ a { color: var(--primary); }
 .marco--feito { background: var(--success-soft); border-color: var(--success); }
 .marco__nome { flex: 1; }
 
+/* Trecho de SQL para copiar */
+.codigo {
+  padding: .75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-sunk);
+  font-family: var(--font-num);
+  font-size: .75rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+code {
+  padding: .0625rem .25rem;
+  border-radius: 3px;
+  background: var(--surface-sunk);
+  font-family: var(--font-num);
+  font-size: .875em;
+}
+
 /* ==========================================================================
    Selos
    ========================================================================== */
