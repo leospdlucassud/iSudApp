@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Obra Missionária — Ala Queimados
+   Obra Missionária — Ala Palmas 4
    Design system. Tokens, shell e componentes.
    ========================================================================== */
 
@@ -9,40 +9,45 @@
   /* Escala tipográfica — controlada pelos botões A- / A+ */
   --fs: 16px;
 
-  /* Marca (padrão do app do bispado) */
+  /* Marca */
   --navy-900: #0b1d33;
   --navy-800: #12294a;
   --navy-700: #1a3760;
-  --gold:     #d9a441;
-  --gold-dim: #b3862f;
-  --sky:      #8fb3d9;
+  --gold:     #7d5f18;  /* bronze — o dourado claro não alcança 4.5:1 no bege */
+  --gold-dim: #6f5414;
+  --sky:      #5d5545;
 
-  /* Superfícies */
-  --bg:            #eef1f5;
-  --surface:       #ffffff;
-  --surface-2:     #f7f9fc;
-  --surface-sunk:  #e9edf3;
-  --border:        #d8dfe8;
-  --border-strong: #b9c4d2;
+  /* --------------------------------------------------------------------
+     Superfícies — marfim e bege.
+     Cabeçalho e corpo compartilham --bg de propósito: são a mesma folha.
+     Os cartões usam --surface, um degrau mais claro, e é isso que os
+     separa do fundo, não uma faixa de cor no topo.
+     -------------------------------------------------------------------- */
+  --bg:            #f2ece0;  /* bege — fundo E cabeçalho */
+  --surface:       #fdfbf6;  /* marfim — cartões */
+  --surface-2:     #f7f2e7;
+  --surface-sunk:  #e8e0cf;
+  --border:        #ddd5c3;
+  --border-strong: #c5b99f;
 
-  /* Texto */
-  --text:    #17202b;
-  --text-2:  #5b6775;
-  --text-3:  #8894a3;
+  /* Texto — todos conferidos contra o marfim e o bege */
+  --text:    #2b2519;  /* 14,7:1 no marfim */
+  --text-2:  #5d5545;  /* 7,1:1  */
+  --text-3:  #6f6656;  /* 5,5:1 no marfim, 4,8:1 no bege */
   --on-dark: #ffffff;
 
   /* Semântica */
   --primary:      var(--navy-800);
-  --primary-soft: #e5ecf6;
+  --primary-soft: #e5e9f0;
   --accent:       var(--gold);
   --success:      #1f7a41;
-  --success-soft: #e2f3e9;
-  --warning:      #a86612;
-  --warning-soft: #fdf0d9;
+  --success-soft: #e6f0e2;
+  --warning:      #8a5a10;
+  --warning-soft: #f7edd6;
   --danger:       #b3261e;
-  --danger-soft:  #fbe5e3;
+  --danger-soft:  #f7e3df;
   --info:         #1c5f8a;
-  --info-soft:    #e2eff8;
+  --info-soft:    #e2ecf4;
 
   /* --------------------------------------------------------------------
      Paleta categórica — ordem FIXA, atribuída em sequência, nunca ciclada.
@@ -79,9 +84,23 @@
   --seq-6: #184f95;
 
   /* Cromo do gráfico */
-  --grade: #e1e0d9;
-  --eixo:  #c3c2b7;
-  --tinta-eixo: #898781;
+  --grade: #e7dfcd;
+  --eixo:  #cdc2ab;
+  --tinta-eixo: #6f6656;
+
+  /* --------------------------------------------------------------------
+     Cabeçalho — tokens próprios porque ele deixou de ser sempre escuro.
+     No claro é bege com tinta escura; no escuro segue o fundo do tema.
+     -------------------------------------------------------------------- */
+  --hdr-bg:            var(--bg);
+  --hdr-titulo:        var(--navy-800);
+  --hdr-sub:           var(--text-2);
+  --hdr-realce:        var(--gold);            /* linha da Igreja, templo, selo */
+  --hdr-realce-bg:     rgba(125, 95, 24, .10);
+  --hdr-btn-borda:     var(--border-strong);
+  --hdr-btn-bg:        rgba(43, 37, 25, .04);
+  --hdr-btn-bg-hover:  rgba(43, 37, 25, .09);
+  --hdr-btn-texto:     var(--text);
 
   /* Forma */
   --r-sm: 6px;
@@ -95,8 +114,6 @@
 
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-num: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
-
-  --header-grad: linear-gradient(170deg, var(--navy-800) 0%, var(--navy-900) 100%);
 }
 
 [data-theme="dark"] {
@@ -158,7 +175,16 @@
   --shadow-2: 0 4px 12px rgba(0,0,0,.45);
   --shadow-3: 0 12px 32px rgba(0,0,0,.55);
 
-  --header-grad: linear-gradient(170deg, #14243c 0%, #0a1422 100%);
+  /* Cabeçalho: mesma regra do claro — segue o fundo do tema, sem faixa. */
+  --hdr-bg:            var(--bg);
+  --hdr-titulo:        var(--text);
+  --hdr-sub:           var(--sky);
+  --hdr-realce:        var(--gold);
+  --hdr-realce-bg:     rgba(232, 188, 99, .12);
+  --hdr-btn-borda:     rgba(255, 255, 255, .28);
+  --hdr-btn-bg:        rgba(255, 255, 255, .08);
+  --hdr-btn-bg-hover:  rgba(255, 255, 255, .18);
+  --hdr-btn-texto:     var(--on-dark);
 }
 
 html { color-scheme: light dark; font-size: var(--fs); }
@@ -197,27 +223,28 @@ a { color: var(--primary); }
    ========================================================================== */
 
 .hdr {
-  background: var(--header-grad);
-  color: var(--on-dark);
+  background: var(--hdr-bg);
+  color: var(--text);
   padding: 1.25rem 1rem 1rem;
   text-align: center;
   position: relative;
 }
+/* Fio de bronze só para dar acabamento; o corpo continua na mesma cor. */
 .hdr::after {
   content: '';
-  position: absolute; inset: auto 0 0 0; height: 2px;
-  background: linear-gradient(90deg, transparent, var(--gold), transparent);
-  opacity: .65;
+  position: absolute; inset: auto 0 0 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--hdr-realce), transparent);
+  opacity: .45;
 }
 
-.hdr__temple { display: block; margin: 0 auto .625rem; color: var(--gold); }
+.hdr__temple { display: block; margin: 0 auto .625rem; color: var(--hdr-realce); }
 
 .hdr__church {
   font-size: .6875rem;
   font-weight: 600;
   letter-spacing: .11em;
   text-transform: uppercase;
-  color: var(--gold);
+  color: var(--hdr-realce);
   margin-bottom: .375rem;
 }
 
@@ -226,11 +253,12 @@ a { color: var(--primary); }
   font-weight: 700;
   letter-spacing: -.015em;
   line-height: 1.15;
+  color: var(--hdr-titulo);
 }
 
 .hdr__sub {
   font-size: .875rem;
-  color: var(--sky);
+  color: var(--hdr-sub);
   margin-top: .1875rem;
 }
 
@@ -240,12 +268,12 @@ a { color: var(--primary); }
   padding: .3125rem .875rem;
   border: 1px solid var(--gold-dim);
   border-radius: var(--r-pill);
-  background: rgba(217,164,65,.12);
-  color: var(--gold);
+  background: var(--hdr-realce-bg);
+  color: var(--hdr-realce);
   font-size: .8125rem;
   font-weight: 600;
 }
-.hdr__role:hover { background: rgba(217,164,65,.2); }
+.hdr__role:hover { filter: brightness(.96); }
 
 .hdr__tools {
   display: flex; justify-content: center; gap: .5rem;
@@ -255,14 +283,14 @@ a { color: var(--primary); }
 .hdr__btn {
   display: inline-flex; align-items: center; gap: .3125rem;
   padding: .3125rem .75rem;
-  border: 1px solid rgba(255,255,255,.28);
+  border: 1px solid var(--hdr-btn-borda);
   border-radius: var(--r-pill);
-  background: rgba(255,255,255,.08);
-  color: var(--on-dark);
+  background: var(--hdr-btn-bg);
+  color: var(--hdr-btn-texto);
   font-size: .8125rem;
   transition: background .15s;
 }
-.hdr__btn:hover { background: rgba(255,255,255,.18); }
+.hdr__btn:hover { background: var(--hdr-btn-bg-hover); }
 .hdr__btn[disabled] { opacity: .4; cursor: not-allowed; }
 
 /* ==========================================================================
@@ -273,7 +301,9 @@ a { color: var(--primary); }
   display: flex;
   gap: .25rem;
   padding: 0 .5rem;
-  background: var(--surface);
+  /* Acompanha o fundo, não a superfície dos cartões: senão o app fica
+     listrado — bege no topo, marfim na barra, bege no corpo. */
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
   scrollbar-width: none;

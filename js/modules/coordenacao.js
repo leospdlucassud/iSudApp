@@ -10,7 +10,7 @@
  */
 
 import {
-  AREAS_PADRAO, PARTICIPANTES_COORDENACAO, SECOES_PLANO, TIPOS_ACOMPANHADO,
+  ALA, AREAS_PADRAO, PARTICIPANTES_COORDENACAO, SECOES_PLANO, TIPOS_ACOMPANHADO,
   MARCAS_SEMANA, corDaArea,
 } from '../config.js';
 import { cartaoIndicador } from '../charts.js';
@@ -494,7 +494,7 @@ function imprimirPauta(r, p) {
   const linhas = [];
 
   linhas.push(`REUNIÃO DE COORDENAÇÃO MISSIONÁRIA`);
-  linhas.push(`Ala Queimados — ${dataLonga(r.data)}`);
+  linhas.push(`${ALA.nome} — ${dataLonga(r.data)}`);
   linhas.push('');
 
   linhas.push(`PESSOAS PROGREDINDO (${p.emProgresso.length})`);

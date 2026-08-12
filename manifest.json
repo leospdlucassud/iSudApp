@@ -1,13 +1,13 @@
 {
-  "name": "Obra Missionária — Ala Queimados",
+  "name": "Obra Missionária — Ala Palmas 4",
   "short_name": "Obra Missionária",
   "description": "Ferramentas para o líder de missão da ala: relatório de progresso, calendário de almoço, disponibilidade para lições e acompanhamento no caminho do convênio.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#12294a",
-  "theme_color": "#12294a",
+  "background_color": "#f2ece0",
+  "theme_color": "#f2ece0",
   "lang": "pt-BR",
   "dir": "ltr",
   "icons": [

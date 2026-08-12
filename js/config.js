@@ -8,9 +8,16 @@
  *    "Relatório de Progresso: No Caminho do Convênio".
  */
 
+/**
+ * Identidade da ala.
+ *
+ * Fonte única para tudo que exibe o nome. O `index.html` repete o título e o
+ * subtítulo em HTML estático só para a primeira pintura não piscar — se mudar
+ * aqui, mude lá também. O resto do app lê destas constantes.
+ */
 export const ALA = {
-  nome: 'Ala Queimados',
-  titulo: 'Obra Missionária da Ala Queimados',
+  nome: 'Ala Palmas 4',
+  titulo: 'Obra Missionária da Ala Palmas 4',
   subtitulo: 'Ferramentas para o LMA',
   igreja: 'A Igreja de Jesus Cristo dos Santos dos Últimos Dias',
 };
@@ -28,10 +35,8 @@ export const ALA = {
  * gravado de verdade, com um botão para criar estas.
  */
 export const AREAS_PADRAO = [
-  { id: 'queimados',   nome: 'Queimados',     cor: 0, ordem: 1, ativa: true },
-  { id: 'jardins',     nome: 'Jardins',       cor: 1, ordem: 2, ativa: true },
-  { id: 'engPedreira', nome: 'Eng. Pedreira', cor: 2, ordem: 3, ativa: true },
-  { id: 'paracambi',   nome: 'Paracambí',     cor: 3, ordem: 4, ativa: true },
+  { id: 'area1', nome: 'Área 1', cor: 0, ordem: 1, ativa: true },
+  { id: 'area2', nome: 'Área 2', cor: 1, ordem: 2, ativa: true },
 ];
 
 /** Slot categórico fixo. A cor segue a entidade, nunca a posição na lista. */

@@ -53,7 +53,8 @@ export function aplicarTema(t = temaAtual()) {
   document.documentElement.dataset.theme = t;
   localStorage.setItem(CH_TEMA, t);
   const meta = $('meta[name="theme-color"]');
-  if (meta) meta.content = t === 'dark' ? '#0a1422' : '#12294a';
+  // Acompanha --bg de cada tema: a barra do navegador emenda com o cabeçalho.
+  if (meta) meta.content = t === 'dark' ? '#0d1219' : '#f2ece0';
   return t;
 }
 

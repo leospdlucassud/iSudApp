@@ -1,5 +1,5 @@
 -- =============================================================================
--- Obra Missionária — Ala Queimados
+-- Obra Missionária — Ala Palmas 4
 -- Esquema, constraints, RLS e Realtime.
 --
 -- Rode este arquivo inteiro no SQL Editor do Supabase. É idempotente: pode
@@ -57,11 +57,11 @@ create table if not exists public.areas (
   ativa  boolean not null default true
 );
 
+-- Áreas de partida. O LMA cria, renomeia e desativa pela tela de
+-- Configurações; isto aqui só garante que o app não abra sem nenhuma.
 insert into public.areas (id, nome, cor, ordem) values
-  ('queimados',   'Queimados',     0, 1),
-  ('jardins',     'Jardins',       1, 2),
-  ('engPedreira', 'Eng. Pedreira', 2, 3),
-  ('paracambi',   'Paracambí',     3, 4)
+  ('area1', 'Área 1', 0, 1),
+  ('area2', 'Área 2', 1, 2)
 on conflict (id) do nothing;
 
 -- Duplas de missionários por área e mês — os nomes que apareciam no cabeçalho

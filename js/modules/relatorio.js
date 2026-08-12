@@ -15,7 +15,7 @@
  */
 
 import {
-  AREAS_PADRAO, FAIXAS, FUNIL, INDICADORES, INDICADORES_CHAVE,
+  ALA, AREAS_PADRAO, FAIXAS, FUNIL, INDICADORES, INDICADORES_CHAVE,
   FREQUENCIA, MESES, ORGANIZACOES, SUBCAMPOS, corDaArea, faixaEtaria,
 } from '../config.js';
 import {
@@ -358,7 +358,8 @@ function painelConsolidado() {
     barraDeMes(),
     el('div', { class: 'card' },
       el('div', { class: 'card__head' },
-        el('span', { class: 'card__title' }, `Ala Queimados — soma de ${areas.length} áreas`),
+        el('span', { class: 'card__title' },
+          `${ALA.nome} — soma de ${areas.length} área${areas.length === 1 ? '' : 's'}`),
         el('button', { class: 'btn btn--ghost btn--sm', type: 'button', onclick: exportarCSV }, '⬇ CSV'),
       ),
       el('div', { class: 'table-wrap' },
