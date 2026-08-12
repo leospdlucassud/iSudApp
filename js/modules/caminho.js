@@ -19,8 +19,8 @@ import {
 } from '../config.js';
 import { cartaoIndicador } from '../charts.js';
 import {
-  DIAS_JANELA, alertasDoCaminho, marcoFeito as buscarMarco, marcosDe,
-  mesesNoCaminho, precisaDeAtencao, presencaEm as buscarPresenca, progresso as calcProgresso,
+  alertasDoCaminho, marcoFeito as buscarMarco, marcosDe, mesesNoCaminho,
+  precisaDeAtencao, presencaEm as buscarPresenca, progresso as calcProgresso,
 } from '../regras.js';
 import { comparaNome, dataCurta, dataLonga, domingosDoMes, hoje } from '../util.js';
 import { confirmar, el, modal, toast, vazio } from '../ui.js';

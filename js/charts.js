@@ -58,9 +58,18 @@ function escala(max, alvoLinhas = 4) {
    ========================================================================== */
 
 let dica;
-function mostrarDica(html, ev) {
+
+/**
+ * @param {Node|Node[]} conteudo
+ *
+ * Monta nós em vez de string de HTML. Antes era innerHTML com os nomes de área
+ * interpolados direto: nome de área é escrito pelo LMA, então bastava batizar
+ * uma área com markup para ele executar ao passar o mouse. Construir o DOM
+ * fecha o buraco na origem, em vez de depender de lembrar do escape.
+ */
+function mostrarDica(conteudo, ev) {
   dica ??= document.body.appendChild(el('div', { class: 'viz-dica', role: 'tooltip' }));
-  dica.innerHTML = html;
+  dica.replaceChildren(...[conteudo].flat().filter(Boolean));
   dica.style.display = 'block';
   const r = dica.getBoundingClientRect();
   const x = Math.min(Math.max(8, ev.clientX + 14), innerWidth - r.width - 8);
@@ -69,9 +78,17 @@ function mostrarDica(html, ev) {
 }
 const esconderDica = () => { if (dica) dica.style.display = 'none'; };
 
+const tituloDica = (texto) => el('b', { class: 'viz-dica__titulo' }, texto);
+
 const chaveDica = (cor, rotulo, valor) =>
-  `<span class="viz-dica__linha"><span class="viz-dica__chave" style="background:${cor}"></span>` +
-  `<span>${rotulo}</span><b>${valor}</b></span>`;
+  el('span', { class: 'viz-dica__linha' },
+    el('span', { class: 'viz-dica__chave', style: `background:${cor}` }),
+    el('span', {}, rotulo),
+    el('b', {}, valor),
+  );
+
+const totalDica = (rotulo, valor) =>
+  el('span', { class: 'viz-dica__total' }, rotulo, el('b', {}, valor));
 
 /* ==========================================================================
    Moldura: título, legenda, gráfico e o gêmeo em tabela
@@ -209,8 +226,7 @@ function camadaDeFoco({ L, T, pw, ph, x, categorias, series }) {
     const entrar = (ev) => {
       fio.setAttribute('x1', x(i)); fio.setAttribute('x2', x(i)); fio.setAttribute('opacity', '.6');
       mostrarDica(
-        `<b class="viz-dica__titulo">${c}</b>` +
-        series.map(z => chaveDica(z.cor, z.nome, n(z.valores[i]))).join(''),
+        [tituloDica(c), ...series.map(z => chaveDica(z.cor, z.nome, n(z.valores[i])))],
         ev,
       );
     };
@@ -286,12 +302,11 @@ export function colunasEmpilhadas({ categorias, series, altura = 260, unidade = 
     svg.append(s('text', { x: cx, y: H - 12, 'text-anchor': 'middle', class: 'viz__tick' }, c));
 
     const alvo = s('rect', { x: L + banda * i, y: T, width: banda, height: ph, fill: 'transparent' });
-    alvo.addEventListener('mousemove', (ev) => mostrarDica(
-      `<b class="viz-dica__titulo">${c}</b>` +
-      series.map(z => chaveDica(z.cor, z.nome, n(z.valores[i]))).join('') +
-      `<span class="viz-dica__total">Total <b>${n(totais[i])}${unidade}</b></span>`,
-      ev,
-    ));
+    alvo.addEventListener('mousemove', (ev) => mostrarDica([
+      tituloDica(c),
+      ...series.map(z => chaveDica(z.cor, z.nome, n(z.valores[i]))),
+      totalDica('Total', `${n(totais[i])}${unidade}`),
+    ], ev));
     alvo.addEventListener('mouseleave', esconderDica);
     svg.append(alvo);
   });
@@ -371,9 +386,10 @@ export function mapaCalor({ colunas, linhas: nomesLinha, valores, rotuloValor = 
         width: cel - gap, height: cel - gap, rx: 3,
         fill: `var(--seq-${nivel})`,
       });
-      rect.addEventListener('mousemove', (ev) => mostrarDica(
-        `<b class="viz-dica__titulo">${nome} · ${c}</b>` +
-        `<span class="viz-dica__total">${rotuloValor} <b>${n(v)}</b></span>`, ev));
+      rect.addEventListener('mousemove', (ev) => mostrarDica([
+        tituloDica(`${nome} · ${c}`),
+        totalDica(rotuloValor, n(v)),
+      ], ev));
       rect.addEventListener('mouseleave', esconderDica);
       svg.append(rect);
     });

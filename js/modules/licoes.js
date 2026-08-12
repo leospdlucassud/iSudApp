@@ -148,7 +148,10 @@ function painelMinha() {
       for (const h of HORARIOS) {
         const id = `${modalidade}|${dia.key}|${h}`;
         const cel = el('button', {
-          class: 'slot', type: 'button', 'aria-pressed': 'false',
+          // Nasce no estado certo. Antes a grade era criada vazia e depois
+          // corrigida lendo o aria-label de volta — e a busca de horário nunca
+          // casava, só funcionava pelo fallback.
+          class: 'slot', type: 'button', 'aria-pressed': String(marcados.has(id)),
           'aria-label': `${dia.label}, ${h}`,
           onclick: () => {
             const ligado = marcados.has(id);
@@ -182,15 +185,7 @@ function painelMinha() {
         onclick: () => { modalidadeForm = m.key; desenharGrade(); },
       }, `${m.icone} ${m.label}`)),
     );
-    // Redesenha a grade, reaplicando o que já estava marcado nesta modalidade.
-    const g = grade(modalidadeForm);
-    areaGrade.replaceChildren(g);
-    for (const cel of g.querySelectorAll('.slot')) {
-      const [dia, h] = cel.getAttribute('aria-label').split(', ');
-      const diaKey = DIAS.find(d => d.label === dia).key;
-      const horario = HORARIOS.find(x => x.replace(' - ', '–') === h) ?? h;
-      if (marcados.has(`${modalidadeForm}|${diaKey}|${horario}`)) cel.setAttribute('aria-pressed', 'true');
-    }
+    areaGrade.replaceChildren(grade(modalidadeForm));
   };
   desenharGrade();
 

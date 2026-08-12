@@ -13,14 +13,19 @@ export function esc(s) {
     .replace(/'/g, '&#39;');
 }
 
-/** Cria um elemento. `attrs.class`, `attrs.dataset` e `on*` são tratados. */
+/**
+ * Cria um elemento. `attrs.class`, `attrs.dataset` e `on*` são tratados.
+ *
+ * Filhos entram sempre como texto, nunca como HTML: não existe atalho para
+ * innerHTML aqui de propósito. Nome de área, nome de membro e observação são
+ * escritos por gente, e um único ponto que aceite markup basta para estragar.
+ */
 export function el(tag, attrs = {}, ...filhos) {
   const n = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
     if (v == null || v === false) continue;
     if (k === 'class') n.className = v;
     else if (k === 'dataset') Object.assign(n.dataset, v);
-    else if (k === 'html') n.innerHTML = v;
     else if (k.startsWith('on') && typeof v === 'function') n.addEventListener(k.slice(2).toLowerCase(), v);
     else n.setAttribute(k, v === true ? '' : v);
   }
@@ -108,7 +113,7 @@ let modalAberto = null;
 /**
  * @param {object} o
  * @param {string} o.titulo
- * @param {string|Node} o.corpo
+ * @param {Node} o.corpo
  * @param {string} [o.confirmar] rótulo do botão; `null` esconde o botão
  * @param {string} [o.cancelar]
  * @param {'primary'|'danger'} [o.tom]
@@ -126,7 +131,7 @@ export function modal({ titulo, corpo, confirmar = 'Salvar', cancelar = 'Cancela
 
     box.append(
       el('div', { class: 'modal__head' }, el('h3', { class: 'modal__title' }, titulo), btnFechar),
-      el('div', { class: 'modal__body' }, typeof corpo === 'string' ? el('div', { html: corpo }) : corpo),
+      el('div', { class: 'modal__body' }, corpo),
       (btnCancel || btnOk) && el('div', { class: 'modal__foot' }, btnCancel, btnOk),
     );
 

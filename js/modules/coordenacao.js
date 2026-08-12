@@ -16,8 +16,7 @@ import {
 import { cartaoIndicador } from '../charts.js';
 import { alertasDoCaminho, precisaDeAtencao } from '../regras.js';
 import {
-  comparaNome, dataCurta, dataLonga, diasEntre, diasDoMes, domingoDaSemana,
-  hoje, somaDias,
+  comparaNome, dataCurta, dataLonga, diasEntre, domingoDaSemana, hoje, somaDias,
 } from '../util.js';
 import { confirmar, el, modal, toast, vazio } from '../ui.js';
 
