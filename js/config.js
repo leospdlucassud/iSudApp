@@ -39,6 +39,26 @@ export const ALA = {
  */
 export const DOMINIO_USUARIO = 'isudapp.netlify.app';
 
+/**
+ * O e-mail de acesso traz um código de 6 dígitos, ou só o link?
+ *
+ * O código só existe se o template "Magic link or OTP" contiver {{ .Token }},
+ * e o Supabase no plano free NÃO deixa editar template nenhum enquanto o
+ * projeto usar o servidor de e-mail embutido: a tela mostra "Set up custom
+ * SMTP to edit templates" e os campos ficam travados. O padrão manda só o
+ * link.
+ *
+ * Enquanto isto for `false`, o app não pede código que nunca vai chegar: ele
+ * avisa que mandou um link e que o link precisa ser aberto NESTE aparelho.
+ *
+ * Vire para `true` depois de ligar um SMTP próprio (Resend, Brevo e afins têm
+ * plano gratuito) e acrescentar {{ .Token }} ao template. Aí o e-mail traz o
+ * código, e quem pede no computador entra no computador.
+ *
+ * O login do dono não depende disto: usuário e senha não passam por e-mail.
+ */
+export const CODIGO_POR_EMAIL = false;
+
 /* ---------------------------------------------------------------------------
    Áreas e duplas
    Uma dupla de missionários por área. O relatório é lançado por área e o

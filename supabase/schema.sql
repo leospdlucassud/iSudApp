@@ -607,17 +607,37 @@ end $$;
 -- values ('leoadm@isudapp.netlify.app', 'Dono', true)
 -- on conflict (email) do update set dono = true;
 
--- Os demais LMAs entram pelo próprio app, em Configurações -> Acesso, e usam o
--- código de 6 dígitos que chega no e-mail deles. Não precisam de conta criada
--- à mão aqui: o primeiro código cria a conta no Auth, e é a linha em `lideres`
--- que decide se ela abre alguma coisa.
+-- =============================================================================
+-- OS DEMAIS LMAs
 --
--- Para o código chegar, o template de e-mail precisa conter {{ .Token }}:
--- Authentication -> Emails -> Magic Link. Sem isso, o e-mail sai só com o
--- link, e o link loga no aparelho em que for aberto — que era o problema.
+-- A linha em `lideres` é o que autoriza, e ela você cria pelo próprio app, em
+-- Configurações -> Acesso. Falta só a pessoa ter como entrar, e há dois jeitos.
+--
+-- a) RECOMENDADO — conta com senha, criada por você:
+--       Authentication -> Users -> Add user, com "Auto Confirm User" marcado.
+--    Use `nome@isudapp.netlify.app` para ela entrar digitando só `nome`, ou o
+--    e-mail real dela. Depois inclua ESSE mesmo endereço na lista pelo app.
+--    Não depende de e-mail chegando a lugar nenhum.
+--
+-- b) Por e-mail: a pessoa toca em "Logar como ADM" -> "Receber um link por
+--    e-mail". O primeiro acesso cria a conta no Auth sozinho. Funciona, mas o
+--    link conecta o aparelho que o ABRIR — pedir no computador e abrir no
+--    celular loga o celular.
+--
+-- O código de 6 dígitos resolveria (b), e o app já sabe pedi-lo: basta virar
+-- CODIGO_POR_EMAIL para `true` em js/config.js. Só que ele depende de
+-- {{ .Token }} no template "Magic link or OTP", e o plano free do Supabase
+-- trava a edição de templates enquanto o projeto usar o servidor de e-mail
+-- embutido ("Set up custom SMTP to edit templates"). Ligando um SMTP próprio
+-- — Resend, Brevo e afins têm plano gratuito —, o template abre e o corpo
+-- passa a ser:
 --
 --     <h2>Entrar no app da Obra Missionária</h2>
 --     <p>Seu código de acesso é:</p>
 --     <p style="font-size:28px;letter-spacing:6px"><b>{{ .Token }}</b></p>
 --     <p>Ou <a href="{{ .ConfirmationURL }}">entre por este link</a> — mas
 --        ele conecta o aparelho em que for aberto.</p>
+--
+-- SMTP próprio resolve outra coisa também: o servidor embutido do Supabase é
+-- limitado a poucos e-mails por hora e é declaradamente não-produtivo.
+-- =============================================================================

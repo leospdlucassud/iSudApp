@@ -1,6 +1,6 @@
 /** Casca do aplicativo: cabeçalho, navegação, rotas e carregamento dos módulos. */
 
-import { INICIO, MODULOS } from './config.js';
+import { CODIGO_POR_EMAIL, INICIO, MODULOS } from './config.js';
 import * as db from './db.js';
 import {
   $, el, modal, toast,
@@ -60,13 +60,17 @@ function ligarCabecalho() {
    token. Não existe login "só no JavaScript" aqui: seria decoração num arquivo
    que qualquer pessoa baixa, e o banco negaria tudo do mesmo jeito.
 
-     1. Usuário e senha — a conta do dono. A sessão nasce neste aparelho.
-     2. Código de 6 dígitos no e-mail — para os demais LMAs.
+     1. Usuário e senha — a conta do dono, e de quem mais receber conta
+        criada no painel do Supabase. A sessão nasce neste aparelho.
+     2. E-mail — para quem só tem o e-mail liberado na lista de líderes.
 
-   O código passou a ser o caminho do e-mail por um motivo concreto: quem pedia
-   o link no computador e abria o e-mail no celular acabava logado no celular,
-   porque a sessão nasce em quem ABRE o link. O link continua chegando no mesmo
-   e-mail e continua valendo; só deixou de ser a única opção.
+   A porta do e-mail entrega código de 6 dígitos ou link conforme
+   CODIGO_POR_EMAIL, em js/config.js. A diferença importa: a sessão do link
+   nasce em quem ABRE o link, e era isso que fazia quem pedia no computador
+   acabar logado no celular. O código não tem esse problema, mas depende de um
+   template de e-mail que o plano free do Supabase não deixa editar sem SMTP
+   próprio — por isso a constante, e por isso o app avisa em vez de pedir um
+   código que não vai chegar.
 
    Enquanto o Supabase não está configurado, o modo prévia libera as telas
    restritas só neste aparelho, sem qualquer garantia — e diz isso com todas
@@ -113,9 +117,9 @@ async function telaDeSenha() {
     el('button', {
       class: 'btn btn--ghost btn--bloco', type: 'button',
       onclick: () => telaDePedirCodigo(usuario.value),
-    }, '✉️ Receber um código por e-mail'),
+    }, CODIGO_POR_EMAIL ? '✉️ Receber um código por e-mail' : '✉️ Receber um link por e-mail'),
     el('p', { class: 'field__hint', style: 'margin-top:.5rem' },
-      'O código é para quem o dono liberou pelo e-mail e não tem senha.'),
+      'Para quem o dono liberou pelo e-mail e não tem senha.'),
   );
 
   await modal({
@@ -126,7 +130,7 @@ async function telaDeSenha() {
   });
 }
 
-/** Pede o código e devolve o e-mail para o passo seguinte. */
+/** Pede o e-mail e devolve o endereço para o passo seguinte. */
 async function telaDePedirCodigo(sugestao = '') {
   const inicial = String(sugestao || '').includes('@') ? String(sugestao).trim() : '';
   const email = el('input', {
@@ -138,14 +142,15 @@ async function telaDePedirCodigo(sugestao = '') {
     el('div', { class: 'field' },
       el('label', {}, 'E-mail'), email,
       el('p', { class: 'field__hint' },
-        'Precisa ser um e-mail que já tenha acesso liberado. ' +
-        'Você recebe um código de 6 dígitos para digitar aqui mesmo.')),
+        'Precisa ser um e-mail que já tenha acesso liberado. ' + (CODIGO_POR_EMAIL
+          ? 'Você recebe um código de 6 dígitos para digitar aqui mesmo.'
+          : 'Você recebe um link de acesso para abrir neste mesmo aparelho.'))),
   );
 
   const alvo = await modal({
-    titulo: '✉️ Entrar com código',
+    titulo: CODIGO_POR_EMAIL ? '✉️ Entrar com código' : '✉️ Entrar por e-mail',
     corpo,
-    confirmar: 'Enviar código',
+    confirmar: CODIGO_POR_EMAIL ? 'Enviar código' : 'Enviar link',
     aoConfirmar: async () => {
       const v = email.value.trim().toLowerCase();
       await db.pedirCodigo(v);
@@ -156,7 +161,27 @@ async function telaDePedirCodigo(sugestao = '') {
   // O modal resolve com o e-mail, e o encadeamento acontece aqui fora, não
   // dentro do `aoConfirmar`: abrir um modal enquanto o anterior ainda está
   // fechando faria o fechamento do antigo apagar o registro do novo.
-  if (typeof alvo === 'string') await telaDeConferirCodigo(alvo);
+  if (typeof alvo !== 'string') return;
+  if (CODIGO_POR_EMAIL) await telaDeConferirCodigo(alvo);
+  else await telaDeLinkEnviado(alvo);
+}
+
+/**
+ * Sem {{ .Token }} no template, o e-mail sai só com o link. Pedir um código
+ * aqui seria mandar a pessoa esperar por algo que não vem — este aviso troca
+ * o beco sem saída pela única instrução que resolve: abrir o link AQUI.
+ */
+async function telaDeLinkEnviado(email) {
+  const corpo = el('div', {},
+    el('p', { class: 'muted', style: 'margin-bottom:.75rem' },
+      'Enviamos um link de acesso para ', el('strong', {}, email), '.'),
+    el('p', { class: 'small' },
+      'Abra o e-mail neste mesmo aparelho e toque no link. Quem entra é o ' +
+      'aparelho que ABRE o link: se você pedir no computador e abrir no ' +
+      'celular, quem fica logado é o celular.'),
+  );
+
+  await modal({ titulo: '✉️ Link enviado', corpo, confirmar: 'Entendi', cancelar: null });
 }
 
 async function telaDeConferirCodigo(email) {

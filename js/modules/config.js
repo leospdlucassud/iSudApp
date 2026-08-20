@@ -347,11 +347,14 @@ function cartaoDoDono() {
     el('div', { class: 'card__body' },
       el('ul', { style: 'padding-left:1.125rem;display:grid;gap:.5rem;margin-bottom:1rem' },
         item('Quem entra nesta lista abre exatamente as mesmas telas que você.'),
-        item('Adicionar aqui não manda convite. Avise a pessoa para abrir o app, tocar em ' +
-             '"Logar como ADM" e escolher "Receber um código por e-mail" — o código chega ' +
-             'no e-mail cadastrado e ela digita no próprio aparelho.'),
-        item('Ninguém que entrou por código consegue conceder acesso a mais ninguém. ' +
-             'Só a conta de dono, que entra com usuário e senha.'),
+        item('Adicionar aqui não manda convite, e a pessoa ainda precisa de um jeito de ' +
+             'entrar. O mais firme é criar a conta dela no painel do Supabase, em ' +
+             'Authentication → Users → Add user, com "Auto Confirm" marcado: aí ela entra ' +
+             'com usuário e senha, sem depender de e-mail nenhum.'),
+        item('O outro caminho é ela tocar em "Logar como ADM" → "Receber um link por ' +
+             'e-mail". Funciona, mas o link conecta o aparelho que o ABRIR — quem pede no ' +
+             'computador e abre no celular fica logado no celular.'),
+        item('Ninguém além de você concede acesso, seja como entrar. Só a conta de dono.'),
         item('Tirar o acesso é imediato: sem a linha na lista, a sessão que a pessoa ' +
              'ainda tenha aberta deixa de abrir qualquer tela restrita.'),
       ),
