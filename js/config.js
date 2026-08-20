@@ -22,6 +22,23 @@ export const ALA = {
   igreja: 'A Igreja de Jesus Cristo dos Santos dos Últimos Dias',
 };
 
+/**
+ * Domínio que completa um nome de usuário no login com senha.
+ *
+ * O Supabase Auth não conhece "usuário": a identidade é sempre um e-mail. Para
+ * o dono poder entrar digitando só `LeoADM`, o app completa o que vier sem "@"
+ * com este domínio, e a conta é criada no painel do Supabase já com o endereço
+ * inteiro (`leoadm@isudapp.netlify.app`).
+ *
+ * É o domínio do próprio app de propósito: ninguém recebe e-mail nele, e
+ * assim nenhuma caixa de terceiro é usada como identidade emprestada. Como
+ * esse endereço não existe de verdade, "esqueci a senha" por e-mail não
+ * funciona para a conta de dono — trocar a senha é no painel do Supabase.
+ *
+ * Mudar este valor invalida os logins por usuário já criados.
+ */
+export const DOMINIO_USUARIO = 'isudapp.netlify.app';
+
 /* ---------------------------------------------------------------------------
    Áreas e duplas
    Uma dupla de missionários por área. O relatório é lançado por área e o

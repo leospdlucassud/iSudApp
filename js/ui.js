@@ -29,11 +29,23 @@ export function el(tag, attrs = {}, ...filhos) {
     else if (k.startsWith('on') && typeof v === 'function') n.addEventListener(k.slice(2).toLowerCase(), v);
     else n.setAttribute(k, v === true ? '' : v);
   }
+  return anexar(n, ...filhos);
+}
+
+/**
+ * Acrescenta filhos a um nó que JÁ existe, com a mesma filtragem de `el`.
+ *
+ * `Node.append` cru não filtra nada: um `false` vindo de `condicao && el(...)`
+ * vira o texto "false" na tela. Foi exatamente assim que apareceu um "false"
+ * solto no rodapé da tela inicial do LMA. Todo lugar que anexa filho
+ * condicional a um nó pronto passa por aqui.
+ */
+export function anexar(alvo, ...filhos) {
   for (const f of filhos.flat()) {
     if (f == null || f === false) continue;
-    n.append(f instanceof Node ? f : document.createTextNode(String(f)));
+    alvo.append(f instanceof Node ? f : document.createTextNode(String(f)));
   }
-  return n;
+  return alvo;
 }
 
 /* ---------------------------------------------------------------------------
@@ -130,7 +142,7 @@ export function modal({ titulo, corpo, confirmar = 'Salvar', cancelar = 'Cancela
     const btnCancel = cancelar && el('button', { class: 'btn btn--ghost' }, cancelar);
     const btnOk     = confirmar && el('button', { class: `btn btn--${tom}` }, confirmar);
 
-    box.append(
+    anexar(box,
       el('div', { class: 'modal__head' }, el('h3', { class: 'modal__title' }, titulo), btnFechar),
       el('div', { class: 'modal__body' }, corpo),
       (btnCancel || btnOk) && el('div', { class: 'modal__foot' }, btnCancel, btnOk),
@@ -144,7 +156,19 @@ export function modal({ titulo, corpo, confirmar = 'Salvar', cancelar = 'Cancela
       modalAberto = null;
       resolve(valor);
     };
-    const aoTeclar = (e) => { if (e.key === 'Escape') encerrar(null); };
+    // Enter num campo de uma linha confirma, como faria dentro de um <form>.
+    // O modal não é um form (ele vive fora do fluxo da página), então sem isto
+    // quem digita usuário e senha e aperta Enter não acontece nada.
+    const CAMPOS_ENTER = ['text', 'email', 'password', 'tel', 'number', 'search', 'url', 'date'];
+    const aoTeclar = (e) => {
+      if (e.key === 'Escape') return encerrar(null);
+      if (e.key !== 'Enter' || !btnOk || btnOk.disabled) return;
+      const alvo = e.target;
+      if (!box.contains(alvo) || alvo.tagName !== 'INPUT') return;
+      if (!CAMPOS_ENTER.includes(alvo.type)) return;
+      e.preventDefault();
+      btnOk.click();
+    };
 
     btnFechar.addEventListener('click', () => encerrar(null));
     btnCancel?.addEventListener('click', () => encerrar(null));

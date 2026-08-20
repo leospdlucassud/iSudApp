@@ -6,7 +6,7 @@
  * pior do que erro de conexão.
  */
 
-const CACHE = 'om-v5';
+const CACHE = 'om-v6';
 
 const CASCA = [
   '/',

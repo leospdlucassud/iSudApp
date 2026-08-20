@@ -6,13 +6,16 @@
  */
 
 import { MODULOS } from '../config.js';
-import { el } from '../ui.js';
+import { anexar, el } from '../ui.js';
 
 export async function montar(alvo, ctx) {
   const admin = ctx.db.ehAdmin();
   const disponiveis = admin ? MODULOS : MODULOS.filter(m => !m.admin);
 
-  alvo.append(
+  // `anexar`, e não `alvo.append`: o rodapé de login é condicional, e
+  // `Node.append(false)` imprimia um "false" solto abaixo dos azulejos
+  // sempre que o LMA estava logado.
+  anexar(alvo,
     el('div', { class: 'hero' },
       el('h2', {}, admin ? 'Todas as ferramentas' : 'O que você precisa fazer?'),
       el('p', {}, admin

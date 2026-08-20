@@ -416,9 +416,13 @@ a { color: var(--primary); }
   background: var(--primary-soft);
   font-size: 1.5rem;
 }
-.tile__body { flex: 1; min-width: 0; }
-.tile__title { font-size: 1rem; font-weight: 650; }
-.tile__desc  { font-size: .8125rem; color: var(--text-2); margin-top: .1875rem; line-height: 1.45; }
+/* Título e descrição são <span> dentro de um <button>: sem display de bloco
+   eles fluíam em linha e saíam colados ("Calendário de almoçoEscolha um dia
+   livre…"), com o margin-top da descrição ignorado por ser elemento inline.
+   O grid dá o respiro e ainda mantém o selo LMA em linha com o título. */
+.tile__body { flex: 1; min-width: 0; display: grid; gap: .1875rem; }
+.tile__title { display: block; font-size: 1rem; font-weight: 650; line-height: 1.3; }
+.tile__desc  { display: block; font-size: .8125rem; color: var(--text-2); line-height: 1.45; }
 .tile__go    { flex: 0 0 auto; color: var(--text-3); font-size: 1.375rem; }
 
 /* Módulos restritos ganham o dourado da marca. */
@@ -501,6 +505,16 @@ a { color: var(--primary); }
 .btn--danger { background: var(--danger); color: #fff; }
 .btn--sm { padding: .3125rem .625rem; font-size: .8125rem; }
 .btn--icon { padding: .375rem; width: 2rem; height: 2rem; }
+.btn--bloco { display: flex; width: 100%; }
+
+/* Divisória "ou" entre os dois caminhos de login. */
+.ou {
+  display: flex; align-items: center; gap: .625rem;
+  margin: .25rem 0 .875rem;
+  color: var(--text-3);
+  font-size: .6875rem; letter-spacing: .1em; text-transform: uppercase;
+}
+.ou::before, .ou::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
 /* ==========================================================================
    Formulários

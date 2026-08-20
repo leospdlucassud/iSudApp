@@ -3,10 +3,14 @@
  *
  * Áreas, duplas de missionários do mês, quem tem acesso de líder e os dados.
  *
- * Sobre o acesso: a tabela `lideres` é somente leitura pelo app, de propósito.
- * Dar ao app o poder de conceder acesso significaria que uma sessão de líder
- * comprometida poderia se perpetuar. Trocar de LMA acontece uma vez por ano;
- * duas linhas de SQL uma vez por ano é preço barato por essa garantia.
+ * Sobre o acesso: conceder e revogar é privilégio do DONO, a conta que entra
+ * com usuário e senha. Um líder que entrou pelo código no e-mail abre as
+ * mesmas telas, mas não cria acessos novos — assim uma sessão comprometida
+ * não se perpetua sozinha, que era a razão de a lista já ter sido só-leitura.
+ * Promover alguém a dono continua sendo uma linha de SQL, de propósito.
+ *
+ * Quem recusa de verdade são as policies de `lideres`, que exigem eh_dono();
+ * os botões daqui só evitam oferecer o que o banco negaria.
  */
 
 import { AREAS_PADRAO, MESES, corDaArea } from '../config.js';
@@ -290,43 +294,131 @@ async function copiarMesAnterior() {
 --------------------------------------------------------------------------- */
 
 function painelAcesso() {
-  const sql = (email) =>
-    `insert into public.lideres (email, nome)\nvalues ('${email || 'novo@email.com'}', 'Nome')\non conflict (email) do nothing;`;
+  const dono = ctx.db.souDono();
+  const meu = String(ctx.db.emailDaSessao() || '').toLowerCase();
+  const linhas = [...lideres].sort((a, b) => comparaNome(a.email, b.email));
 
   return el('div', {},
     el('div', { class: 'card' },
       el('div', { class: 'card__head' },
-        el('span', { class: 'card__title' }, `${lideres.length} pessoa(s) com acesso de LMA`)),
-      lideres.length
+        el('span', { class: 'card__title' }, `${lideres.length} pessoa(s) com acesso de LMA`),
+        dono && el('button', {
+          class: 'btn btn--primary btn--sm', type: 'button', onclick: formLider,
+        }, '+ Acesso'),
+      ),
+      linhas.length
         ? el('div', { class: 'table-wrap' },
             el('table', { class: 'table' },
-              el('thead', {}, el('tr', {}, el('th', {}, 'E-mail'), el('th', {}, 'Nome'), el('th', {}, 'Desde'))),
-              el('tbody', {}, ...[...lideres].sort((a, b) => comparaNome(a.email, b.email)).map(l =>
-                el('tr', {},
-                  el('td', {}, el('strong', {}, l.email)),
-                  el('td', {}, l.nome ?? '—'),
-                  el('td', { class: 'small muted' }, l.criado_em ? dataCurta(l.criado_em.slice(0, 10)) : '—'),
-                ))),
+              el('thead', {}, el('tr', {},
+                el('th', {}, 'E-mail'), el('th', {}, 'Nome'), el('th', {}, 'Desde'),
+                dono && el('th', {}, ''),
+              )),
+              el('tbody', {}, ...linhas.map(l => el('tr', {},
+                el('td', {},
+                  el('strong', {}, l.email),
+                  l.dono && el('span', { class: 'badge badge--ok', style: 'margin-left:.4375rem' }, 'dono'),
+                  l.email?.toLowerCase() === meu
+                    && el('span', { class: 'badge badge--mute', style: 'margin-left:.4375rem' }, 'você'),
+                ),
+                el('td', {}, l.nome ?? '—'),
+                el('td', { class: 'small muted' }, l.criado_em ? dataCurta(l.criado_em.slice(0, 10)) : '—'),
+                // O dono não aparece com botão de remover: a policy recusaria,
+                // e oferecer um botão que só sabe dar erro é pior do que não ter.
+                dono && el('td', {}, !l.dono && el('button', {
+                  class: 'btn btn--icon btn--ghost', type: 'button',
+                  'aria-label': `Remover o acesso de ${l.email}`,
+                  onclick: () => removerAcesso(l),
+                }, '🗑️')),
+              ))),
             ))
         : vazio('Lista vazia ou sem leitura',
-            'Se você entrou com link mágico e não vê ninguém aqui, a conexão pode estar em modo local.', '🔑'),
+            'Se você entrou como líder e não vê ninguém aqui, a conexão pode estar em modo local.', '🔑'),
     ),
 
-    el('div', { class: 'card' },
-      el('div', { class: 'card__head' }, el('span', { class: 'card__title' }, 'Conceder acesso a alguém')),
-      el('div', { class: 'card__body' },
-        el('p', { class: 'small muted', style: 'margin-bottom:.75rem' },
-          'Isto é feito no SQL Editor do Supabase, não pelo app — de propósito. Se o app pudesse ' +
-          'conceder acesso, uma sessão de líder comprometida poderia se perpetuar sozinha. ' +
-          'Trocar de LMA acontece uma vez por ano; duas linhas de SQL uma vez por ano custam pouco ' +
-          'por essa garantia.'),
-        el('pre', { class: 'codigo' }, sql()),
-        el('p', { class: 'small muted', style: 'margin-top:.75rem' },
-          'Para tirar o acesso de alguém: ',
-          el('code', {}, "delete from public.lideres where email = 'pessoa@email.com';")),
+    dono ? cartaoDoDono() : cartaoDeLiderComum(),
+  );
+}
+
+function cartaoDoDono() {
+  const item = (texto) => el('li', { class: 'small' }, texto);
+
+  return el('div', { class: 'card' },
+    el('div', { class: 'card__head' }, el('span', { class: 'card__title' }, 'Como o acesso funciona')),
+    el('div', { class: 'card__body' },
+      el('ul', { style: 'padding-left:1.125rem;display:grid;gap:.5rem;margin-bottom:1rem' },
+        item('Quem entra nesta lista abre exatamente as mesmas telas que você.'),
+        item('Adicionar aqui não manda convite. Avise a pessoa para abrir o app, tocar em ' +
+             '"Logar como ADM" e escolher "Receber um código por e-mail" — o código chega ' +
+             'no e-mail cadastrado e ela digita no próprio aparelho.'),
+        item('Ninguém que entrou por código consegue conceder acesso a mais ninguém. ' +
+             'Só a conta de dono, que entra com usuário e senha.'),
+        item('Tirar o acesso é imediato: sem a linha na lista, a sessão que a pessoa ' +
+             'ainda tenha aberta deixa de abrir qualquer tela restrita.'),
       ),
+      el('p', { class: 'small muted', style: 'margin-bottom:.5rem' },
+        'Passar a condição de dono para outra conta continua sendo uma linha de SQL, ' +
+        'de propósito — o app não promove ninguém:'),
+      el('pre', { class: 'codigo' },
+        "update public.lideres set dono = true where email = 'pessoa@email.com';"),
     ),
   );
+}
+
+function cartaoDeLiderComum() {
+  return el('div', { class: 'card' },
+    el('div', { class: 'card__head' }, el('span', { class: 'card__title' }, 'Conceder acesso é do dono')),
+    el('div', { class: 'card__body' },
+      el('p', { class: 'small muted' },
+        'Você abre as mesmas telas que os demais líderes, mas criar e remover acessos ' +
+        'é da conta de dono da ala — a que entra com usuário e senha. Se o app pudesse ' +
+        'conceder acesso a partir de qualquer sessão, uma sessão comprometida poderia ' +
+        'se perpetuar sozinha. Peça a quem administra o app.'),
+    ),
+  );
+}
+
+async function formLider() {
+  const email = el('input', { class: 'input', type: 'email', autocomplete: 'off', placeholder: 'pessoa@email.com' });
+  const nome  = el('input', { class: 'input', type: 'text', placeholder: 'como você reconhece a pessoa' });
+
+  const corpo = el('div', {},
+    el('div', { class: 'field' },
+      el('label', {}, 'E-mail'), email,
+      el('p', { class: 'field__hint' },
+        'Precisa ser o e-mail que a pessoa realmente acessa: é para lá que vai o código de entrada.')),
+    el('div', { class: 'field' }, el('label', {}, 'Nome (opcional)'), nome),
+  );
+
+  const ok = await modal({
+    titulo: 'Liberar acesso de LMA',
+    corpo,
+    confirmar: 'Liberar',
+    aoConfirmar: () => ctx.db.adicionarLider(email.value, nome.value),
+  });
+  if (!ok) return;
+
+  await recarregar();
+  pintar();
+  toast('Acesso liberado. Avise a pessoa para entrar com o código do e-mail.', 'ok', 6000);
+}
+
+async function removerAcesso(l) {
+  const ok = await confirmar(
+    'Tirar o acesso?',
+    `${l.email} deixa de abrir relatório, caminho do convênio, coordenação e configurações. ` +
+    'Nada do que já foi lançado é apagado.',
+    { confirmar: 'Tirar o acesso' },
+  );
+  if (!ok) return;
+
+  try {
+    await ctx.db.removerLider(l.email);
+  } catch (err) {
+    return toast(err?.message || 'Não foi possível remover.', 'err');
+  }
+  await recarregar();
+  pintar();
+  toast('Acesso removido.', 'ok');
 }
 
 /* ---------------------------------------------------------------------------

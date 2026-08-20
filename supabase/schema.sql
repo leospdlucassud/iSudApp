@@ -13,9 +13,9 @@
 -- -----------------------------------------------------------------------------
 -- Quem é líder
 --
--- Qualquer pessoa consegue pedir um link mágico para o próprio e-mail e obter
--- uma sessão. Ter sessão, portanto, NÃO é ser líder. A autorização vem desta
--- lista — sem estar aqui, a sessão não abre nada.
+-- Qualquer pessoa consegue pedir um código (ou link) para o próprio e-mail e
+-- obter uma sessão. Ter sessão, portanto, NÃO é ser líder. A autorização vem
+-- desta lista — sem estar aqui, a sessão não abre nada.
 -- -----------------------------------------------------------------------------
 
 create table if not exists public.lideres (
@@ -23,6 +23,23 @@ create table if not exists public.lideres (
   nome       text,
   criado_em  timestamptz not null default now()
 );
+
+-- O dono é o único que concede e revoga acesso pelo próprio app. Todos os
+-- outros líderes abrem as mesmas telas, mas não criam líderes novos: assim uma
+-- sessão comprometida não se perpetua sozinha, que era a razão de a lista ser
+-- só-leitura antes.
+alter table public.lideres add column if not exists dono boolean not null default false;
+
+-- O e-mail entra sempre em minúsculas. A chave primária diferencia maiúsculas
+-- e eh_lider() não: sem isto, 'Fulano@x.com' e 'fulano@x.com' virariam duas
+-- linhas para a mesma pessoa. `not valid` deixa as linhas já gravadas em paz.
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'lideres_email_minusculo') then
+    alter table public.lideres
+      add constraint lideres_email_minusculo check (email = lower(email)) not valid;
+  end if;
+end $$;
 
 comment on table public.lideres is
   'Lista de e-mails autorizados como LMA. Ter sessão não basta: é preciso estar aqui.';
@@ -44,6 +61,25 @@ $$;
 
 revoke all on function public.eh_lider() from public;
 grant execute on function public.eh_lider() to anon, authenticated;
+
+-- Quem é o dono. Mesma mecânica de eh_lider(), usada pelas policies de
+-- escrita da tabela `lideres` e pela tela de Acesso.
+create or replace function public.eh_dono()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.lideres
+    where lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+      and dono
+  );
+$$;
+
+revoke all on function public.eh_dono() from public;
+grant execute on function public.eh_dono() to anon, authenticated;
 
 -- -----------------------------------------------------------------------------
 -- Áreas
@@ -412,9 +448,21 @@ begin
   end loop;
 end $$;
 
--- --- lideres: só líder enxerga a lista; alterar, só direto no SQL Editor ------
+-- --- lideres: líder enxerga a lista; só o dono mexe nela --------------------
+--
+-- As três policies de escrita exigem eh_dono() E `dono = false` na linha
+-- tocada. Isso fecha o caminho de escalada: um líder comum não cria ninguém, e
+-- nem o dono consegue criar um segundo dono pelo app nem se rebaixar sem
+-- querer. Promover alguém a dono continua sendo uma linha de SQL, de propósito.
 create policy lideres_leitura on public.lideres
   for select using (public.eh_lider());
+create policy lideres_inclusao on public.lideres
+  for insert with check (public.eh_dono() and not dono);
+create policy lideres_ajuste on public.lideres
+  for update using (public.eh_dono() and not dono)
+  with check (public.eh_dono() and not dono);
+create policy lideres_remocao on public.lideres
+  for delete using (public.eh_dono() and not dono);
 
 -- --- areas: leitura pública (o calendário precisa), escrita só do líder -------
 create policy areas_leitura on public.areas
@@ -532,10 +580,44 @@ begin
 end $$;
 
 -- =============================================================================
--- ÚLTIMO PASSO — troque pelo seu e-mail e rode.
--- Sem isto, ninguém é líder e as telas restritas ficam vazias para todos.
+-- ÚLTIMO PASSO — a conta de dono
+--
+-- Sem isto ninguém é líder, e as telas restritas ficam vazias para todos.
+--
+-- 1) Crie a conta no painel: Authentication -> Users -> Add user.
+--
+--        Email:    leoadm@isudapp.netlify.app
+--        Password: a senha que você escolheu
+--        Marque "Auto Confirm User".
+--
+--    Esse endereço NÃO é uma caixa de e-mail: ele existe só para o Supabase
+--    Auth ter uma identidade, porque o Auth não conhece "usuário", só e-mail.
+--    O app completa sozinho o que for digitado sem "@" com o domínio do site,
+--    então no login basta escrever `LeoADM`. O domínio fica em
+--    DOMINIO_USUARIO, em js/config.js; mudar lá invalida este login.
+--
+--    Consequência de o endereço não existir: "esqueci a senha" por e-mail não
+--    funciona para esta conta. Trocar a senha é aqui no painel, na mesma tela
+--    de Users.
+--
+-- 2) Rode as três linhas abaixo, descomentadas, com o MESMO e-mail do passo 1.
 -- =============================================================================
 
--- insert into public.lideres (email, nome)
--- values ('leospd.lucas@gmail.com', 'Léo')
--- on conflict (email) do nothing;
+-- insert into public.lideres (email, nome, dono)
+-- values ('leoadm@isudapp.netlify.app', 'Dono', true)
+-- on conflict (email) do update set dono = true;
+
+-- Os demais LMAs entram pelo próprio app, em Configurações -> Acesso, e usam o
+-- código de 6 dígitos que chega no e-mail deles. Não precisam de conta criada
+-- à mão aqui: o primeiro código cria a conta no Auth, e é a linha em `lideres`
+-- que decide se ela abre alguma coisa.
+--
+-- Para o código chegar, o template de e-mail precisa conter {{ .Token }}:
+-- Authentication -> Emails -> Magic Link. Sem isso, o e-mail sai só com o
+-- link, e o link loga no aparelho em que for aberto — que era o problema.
+--
+--     <h2>Entrar no app da Obra Missionária</h2>
+--     <p>Seu código de acesso é:</p>
+--     <p style="font-size:28px;letter-spacing:6px"><b>{{ .Token }}</b></p>
+--     <p>Ou <a href="{{ .ConfirmationURL }}">entre por este link</a> — mas
+--        ele conecta o aparelho em que for aberto.</p>

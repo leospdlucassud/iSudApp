@@ -55,48 +55,136 @@ function ligarCabecalho() {
 /* ---------------------------------------------------------------------------
    Entrada e saída do líder
 
-   A restrição real de acesso mora nas policies do banco. Enquanto o Supabase
-   não está configurado, o modo prévia libera as telas restritas só neste
-   aparelho, sem qualquer garantia — e diz isso com todas as letras.
+   Duas portas, e as duas terminam numa sessão de verdade do Supabase — a
+   restrição real de acesso mora nas policies do banco, que leem o e-mail do
+   token. Não existe login "só no JavaScript" aqui: seria decoração num arquivo
+   que qualquer pessoa baixa, e o banco negaria tudo do mesmo jeito.
+
+     1. Usuário e senha — a conta do dono. A sessão nasce neste aparelho.
+     2. Código de 6 dígitos no e-mail — para os demais LMAs.
+
+   O código passou a ser o caminho do e-mail por um motivo concreto: quem pedia
+   o link no computador e abria o e-mail no celular acabava logado no celular,
+   porque a sessão nasce em quem ABRE o link. O link continua chegando no mesmo
+   e-mail e continua valendo; só deixou de ser a única opção.
+
+   Enquanto o Supabase não está configurado, o modo prévia libera as telas
+   restritas só neste aparelho, sem qualquer garantia — e diz isso com todas
+   as letras.
 --------------------------------------------------------------------------- */
 
 async function entrarComoAdmin() {
   if (db.ehAdmin()) return;
+  if (!db.temBackend()) return entrarEmPrevia();
+  await telaDeSenha();
+}
 
-  if (!db.temBackend()) {
-    const corpo = el('div', {},
-      el('p', { class: 'muted', style: 'margin-bottom:.75rem' },
-        'O acesso de líder é validado pelo banco de dados, que ainda não foi conectado.'),
-      el('p', { class: 'small muted' },
-        'Você pode abrir as telas restritas em modo prévia para conferir o layout. ' +
-        'Nesse modo nada é protegido e os dados ficam só neste aparelho.'),
-    );
-    const ok = await modal({ titulo: 'Acesso do LMA', corpo, confirmar: 'Abrir em modo prévia' });
-    if (ok !== true) return;
-
-    db.entrarEmPrevia();
-    await aoMudarDePapel();
-    toast('Modo prévia ativo. Nada aqui está protegido.', 'warn', 5000);
-    return;
-  }
-
-  const email = el('input', { class: 'input', type: 'email', autocomplete: 'email', placeholder: 'seu e-mail' });
+async function entrarEmPrevia() {
   const corpo = el('div', {},
-    el('div', { class: 'field' },
-      el('label', {}, 'E-mail'), email,
-      el('p', { class: 'field__hint' }, 'Você recebe um link de acesso. Não precisa de senha.')),
+    el('p', { class: 'muted', style: 'margin-bottom:.75rem' },
+      'O acesso de líder é validado pelo banco de dados, que ainda não foi conectado.'),
+    el('p', { class: 'small muted' },
+      'Você pode abrir as telas restritas em modo prévia para conferir o layout. ' +
+      'Nesse modo nada é protegido e os dados ficam só neste aparelho.'),
+  );
+  const ok = await modal({ titulo: 'Acesso do LMA', corpo, confirmar: 'Abrir em modo prévia' });
+  if (ok !== true) return;
+
+  db.entrarEmPrevia();
+  await aoMudarDePapel();
+  toast('Modo prévia ativo. Nada aqui está protegido.', 'warn', 5000);
+}
+
+/** Porta principal: usuário e senha, a conta do dono. */
+async function telaDeSenha() {
+  const usuario = el('input', {
+    class: 'input', type: 'text', autocomplete: 'username',
+    autocapitalize: 'none', autocorrect: 'off', spellcheck: 'false',
+    placeholder: 'usuário ou e-mail',
+  });
+  const senha = el('input', {
+    class: 'input', type: 'password', autocomplete: 'current-password', placeholder: 'senha',
+  });
+
+  const corpo = el('div', {},
+    el('div', { class: 'field' }, el('label', {}, 'Usuário ou e-mail'), usuario),
+    el('div', { class: 'field' }, el('label', {}, 'Senha'), senha),
+    el('div', { class: 'ou' }, el('span', {}, 'ou')),
+    el('button', {
+      class: 'btn btn--ghost btn--bloco', type: 'button',
+      onclick: () => telaDePedirCodigo(usuario.value),
+    }, '✉️ Receber um código por e-mail'),
+    el('p', { class: 'field__hint', style: 'margin-top:.5rem' },
+      'O código é para quem o dono liberou pelo e-mail e não tem senha.'),
   );
 
   await modal({
-    titulo: 'Logar como ADM',
+    titulo: '🔑 Logar como ADM',
     corpo,
-    confirmar: 'Enviar link',
+    confirmar: 'Entrar',
+    aoConfirmar: () => db.entrarComSenha(usuario.value, senha.value),
+  });
+}
+
+/** Pede o código e devolve o e-mail para o passo seguinte. */
+async function telaDePedirCodigo(sugestao = '') {
+  const inicial = String(sugestao || '').includes('@') ? String(sugestao).trim() : '';
+  const email = el('input', {
+    class: 'input', type: 'email', autocomplete: 'email',
+    value: inicial, placeholder: 'seu e-mail',
+  });
+
+  const corpo = el('div', {},
+    el('div', { class: 'field' },
+      el('label', {}, 'E-mail'), email,
+      el('p', { class: 'field__hint' },
+        'Precisa ser um e-mail que já tenha acesso liberado. ' +
+        'Você recebe um código de 6 dígitos para digitar aqui mesmo.')),
+  );
+
+  const alvo = await modal({
+    titulo: '✉️ Entrar com código',
+    corpo,
+    confirmar: 'Enviar código',
     aoConfirmar: async () => {
-      const v = email.value.trim();
-      if (!/^\S+@\S+\.\S+$/.test(v)) throw new Error('Digite um e-mail válido.');
-      await db.enviarLinkDeAcesso(v);
-      toast('Link enviado. Confira sua caixa de entrada.', 'ok', 6000);
+      const v = email.value.trim().toLowerCase();
+      await db.pedirCodigo(v);
+      return v;
     },
+  });
+
+  // O modal resolve com o e-mail, e o encadeamento acontece aqui fora, não
+  // dentro do `aoConfirmar`: abrir um modal enquanto o anterior ainda está
+  // fechando faria o fechamento do antigo apagar o registro do novo.
+  if (typeof alvo === 'string') await telaDeConferirCodigo(alvo);
+}
+
+async function telaDeConferirCodigo(email) {
+  const codigo = el('input', {
+    class: 'input input--num', type: 'text', inputmode: 'numeric',
+    autocomplete: 'one-time-code', maxlength: '6', placeholder: '000000',
+  });
+
+  const corpo = el('div', {},
+    el('p', { class: 'muted', style: 'margin-bottom:.875rem' },
+      'Enviamos um código de 6 dígitos para ', el('strong', {}, email), '.'),
+    el('div', { class: 'field' },
+      el('label', {}, 'Código'), codigo,
+      el('p', { class: 'field__hint' },
+        'Digite o código aqui, neste mesmo aparelho — é o que garante que você ' +
+        'entre onde começou. O link do mesmo e-mail também funciona, mas loga ' +
+        'no aparelho em que for aberto.')),
+    el('button', {
+      class: 'btn btn--ghost btn--bloco', type: 'button',
+      onclick: () => telaDePedirCodigo(email),
+    }, 'Reenviar ou trocar o e-mail'),
+  );
+
+  await modal({
+    titulo: '✉️ Código de acesso',
+    corpo,
+    confirmar: 'Entrar',
+    aoConfirmar: () => db.conferirCodigo(email, codigo.value),
   });
 }
 
@@ -281,12 +369,21 @@ async function iniciar() {
   await db.iniciar();
   pintarPapel();
 
-  // A volta do link mágico chega depois do primeiro render: quando a sessão
-  // resolve, o papel muda e a tela precisa acompanhar.
-  db.aoMudarSessao(async () => {
+  // A sessão resolve depois do primeiro render — seja restaurada do
+  // armazenamento, seja recém-criada pelo login. Quando resolve, o papel muda
+  // e a tela precisa acompanhar.
+  db.aoMudarSessao(async (evento) => {
+    // Renovação silenciosa de token não muda papel nenhum e não deve repintar.
+    if (evento === 'TOKEN_REFRESHED' || evento === 'USER_UPDATED') return;
+
     await aoMudarDePapel();
+
     if (db.sessaoSemPermissao()) {
       toast('Este e-mail não está na lista de líderes da ala.', 'warn', 7000);
+    } else if (evento === 'SIGNED_IN' && db.ehAdmin()) {
+      // Só no login de verdade: em INITIAL_SESSION este aviso reapareceria a
+      // cada recarga de página para quem já está logado.
+      toast('Você entrou como líder de missão da ala.', 'ok');
     }
   });
 

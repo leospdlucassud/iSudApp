@@ -16,6 +16,7 @@
  *     export const ANON_KEY = 'eyJ...';
  */
 
+import { DOMINIO_USUARIO } from './config.js';
 import { uuid } from './util.js';
 
 /** Violação de unicidade — o registro já existe. */
@@ -46,11 +47,17 @@ let backend = null;
 let ehSupabase = false;
 let previa = false;
 
-/** Quem quer ser avisado quando a sessão muda (login pelo link do e-mail). */
+/**
+ * Quem quer ser avisado quando a sessão muda.
+ *
+ * O aviso carrega o evento do GoTrue ('INITIAL_SESSION', 'SIGNED_IN',
+ * 'SIGNED_OUT', 'TOKEN_REFRESHED'...) porque a tela precisa distinguir "acabou
+ * de entrar" de "sessão restaurada na carga da página".
+ */
 const ouvintesDeSessao = new Set();
-const avisarSessao = () => ouvintesDeSessao.forEach(fn => fn());
+const avisarSessao = (evento) => ouvintesDeSessao.forEach(fn => fn(evento));
 
-/** @param {() => void} cb @returns {() => void} cancelador */
+/** @param {(evento: string) => void} cb @returns {() => void} cancelador */
 export function aoMudarSessao(cb) {
   ouvintesDeSessao.add(cb);
   return () => ouvintesDeSessao.delete(cb);
@@ -186,6 +193,26 @@ async function carregarClienteSupabase() {
   return globalThis.supabase.createClient;
 }
 
+/**
+ * Mensagens do GoTrue chegam em inglês e vazam vocabulário de API. Traduz as
+ * que o usuário deste app realmente encontra; o resto passa como veio, para
+ * não engolir informação de um caso não previsto.
+ */
+function traduzirErroDeAuth(error) {
+  const m = String(error?.message || '');
+  if (/invalid login credentials/i.test(m))  return 'Usuário ou senha incorretos.';
+  if (/email not confirmed/i.test(m))        return 'Esta conta ainda não foi confirmada no Supabase.';
+  if (/token has expired|invalid.*token|otp.*expired/i.test(m))
+    return 'Código expirado ou incorreto. Peça um novo.';
+  if (/rate limit|only request this after/i.test(m))
+    return 'Muitas tentativas seguidas. Espere um minuto e tente de novo.';
+  if (/signups? not allowed|not allowed for otp/i.test(m))
+    return 'Este e-mail ainda não tem conta. Peça ao dono para liberar o acesso.';
+  if (/failed to fetch|network/i.test(m))
+    return 'Não foi possível falar com o servidor. Confira a conexão.';
+  return m || 'Não foi possível entrar.';
+}
+
 async function backendSupabase(url, anonKey) {
   const createClient = await carregarClienteSupabase();
   const sb = createClient(url, anonKey, {
@@ -195,6 +222,7 @@ async function backendSupabase(url, anonKey) {
 
   let sessao = null;
   let lider = false;
+  let dono = false;
   let schemaOk = true;
 
   const conferir = ({ data, error }) => {
@@ -207,14 +235,17 @@ async function backendSupabase(url, anonKey) {
   /**
    * Ter sessão não é ser líder.
    *
-   * Qualquer pessoa consegue pedir um link mágico para o próprio e-mail e
-   * receber uma sessão válida. Quem autoriza é a tabela `lideres`, consultada
-   * pela função eh_lider() no banco — a mesma que as policies usam.
+   * Qualquer pessoa consegue pedir um código para o próprio e-mail e receber
+   * uma sessão válida. Quem autoriza é a tabela `lideres`, consultada pela
+   * função eh_lider() no banco — a mesma que as policies usam.
    */
   async function resolverLider() {
-    if (!sessao) return (lider = false);
-    const { data, error } = await sb.rpc('eh_lider');
-    lider = !error && data === true;
+    if (!sessao) return (lider = dono = false);
+    const [ehLider, ehDono] = await Promise.all([sb.rpc('eh_lider'), sb.rpc('eh_dono')]);
+    lider = !ehLider.error && ehLider.data === true;
+    // eh_dono() é nova: num banco onde o schema.sql ainda não rodou de novo, a
+    // função não existe e o erro só significa "não é dono", não "quebrou".
+    dono = lider && !ehDono.error && ehDono.data === true;
     return lider;
   }
 
@@ -230,26 +261,39 @@ async function backendSupabase(url, anonKey) {
 
       sessao = (await sb.auth.getSession()).data.session;
       await resolverLider();
-      sb.auth.onAuthStateChange(async (_e, s) => {
+      sb.auth.onAuthStateChange(async (evento, s) => {
         sessao = s;
         await resolverLider();
-        avisarSessao();
+        avisarSessao(evento);
       });
     },
 
     get sessao() { return sessao; },
     get souLider() { return lider; },
+    get souDono() { return dono; },
+    get email() { return sessao?.user?.email ?? null; },
     get schemaOk() { return schemaOk; },
 
-    async entrar(email) {
+    /** Conta com senha — a do dono. A sessão nasce neste aparelho. */
+    async entrarComSenha(email, senha) {
+      const { error } = await sb.auth.signInWithPassword({ email, password: senha });
+      if (error) throw new Error(traduzirErroDeAuth(error));
+    },
+
+    async pedirCodigo(email) {
       const { error } = await sb.auth.signInWithOtp({
         email,
         options: { emailRedirectTo: location.origin },
       });
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(traduzirErroDeAuth(error));
     },
 
-    async sair() { await sb.auth.signOut(); sessao = null; lider = false; },
+    async conferirCodigo(email, codigo) {
+      const { error } = await sb.auth.verifyOtp({ email, token: codigo, type: 'email' });
+      if (error) throw new Error(traduzirErroDeAuth(error));
+    },
+
+    async sair() { await sb.auth.signOut(); sessao = null; lider = dono = false; },
 
     async listar(colecao, filtro) {
       let q = sb.from(colecao).select('*');
@@ -398,14 +442,103 @@ export function ehAdmin() {
 export const sessaoSemPermissao = () =>
   ehSupabase && Boolean(backend.sessao) && !backend.souLider;
 
+/**
+ * Só o dono concede e revoga acesso — quem entrou por código no e-mail não.
+ * O app apenas esconde os botões; quem recusa de verdade são as policies de
+ * `lideres`, que exigem eh_dono().
+ */
+export const souDono = () => ehSupabase && backend.souDono;
+
+/** E-mail da sessão, para a tela de Acesso marcar "é você". */
+export const emailDaSessao = () => (ehSupabase ? backend.email : null);
+
 export function entrarEmPrevia() {
   previa = true;
   sessionStorage.setItem('om_previa', '1');
 }
 
-export async function enviarLinkDeAcesso(email) {
+/**
+ * Completa um nome de usuário com o domínio do app.
+ *
+ * O Supabase Auth só entende e-mail. `LeoADM` vira
+ * `leoadm@isudapp.netlify.app`, que é o endereço com que a conta do dono foi
+ * criada no painel. Quem digitar um e-mail de verdade passa intacto.
+ */
+export function usuarioParaEmail(entrada) {
+  const v = String(entrada || '').trim().toLowerCase();
+  if (!v) throw new Error('Digite o usuário ou o e-mail.');
+  if (v.includes('@')) {
+    if (!/^\S+@\S+\.\S+$/.test(v)) throw new Error('E-mail inválido.');
+    return v;
+  }
+  if (!/^[a-z0-9][a-z0-9._-]{1,30}$/.test(v)) {
+    throw new Error('Usuário inválido. Use letras, números, ponto, hífen ou sublinhado.');
+  }
+  return `${v}@${DOMINIO_USUARIO}`;
+}
+
+const exigirSupabase = () => {
   if (!ehSupabase) throw new Error('Backend não configurado.');
-  return backend.entrar(email);
+};
+
+/** Login do dono: usuário (ou e-mail) e senha, sem sair deste aparelho. */
+export async function entrarComSenha(usuario, senha) {
+  exigirSupabase();
+  if (!senha) throw new Error('Digite a senha.');
+  return backend.entrarComSenha(usuarioParaEmail(usuario), senha);
+}
+
+/**
+ * Manda um e-mail com link E código de 6 dígitos.
+ *
+ * O código existe por causa de um problema real: quem pedia o link no
+ * computador e abria o e-mail no celular acabava logado no celular, porque a
+ * sessão nasce em quem abre o link. Digitando o código, a sessão nasce no
+ * aparelho onde o login começou.
+ */
+export async function pedirCodigo(email) {
+  exigirSupabase();
+  if (!/^\S+@\S+\.\S+$/.test(String(email || '').trim())) {
+    throw new Error('Digite um e-mail válido.');
+  }
+  return backend.pedirCodigo(String(email).trim().toLowerCase());
+}
+
+export async function conferirCodigo(email, codigo) {
+  exigirSupabase();
+  const c = String(codigo || '').replace(/\D/g, '');
+  if (c.length < 6) throw new Error('O código tem 6 dígitos.');
+  return backend.conferirCodigo(String(email).trim().toLowerCase(), c);
+}
+
+/* ---------------------------------------------------------------------------
+   Lista de líderes
+
+   Tabela pequena e de chave textual: `email` é a primária, então nem `remover`
+   (que filtra por `id`) nem `inserir` servem aqui sem tratamento próprio.
+--------------------------------------------------------------------------- */
+
+export async function adicionarLider(email, nome) {
+  exigirSupabase();
+  const e = String(email || '').trim().toLowerCase();
+  if (!/^\S+@\S+\.\S+$/.test(e)) throw new Error('Digite um e-mail válido.');
+  const { error } = await backend.sb.from('lideres').insert({ email: e, nome: nome?.trim() || null });
+  if (error) {
+    if (error.code === '23505') throw new Error('Este e-mail já tem acesso.');
+    if (error.code === '42501') throw new Error('Só o dono pode conceder acesso.');
+    throw new Error(error.message);
+  }
+  return e;
+}
+
+export async function removerLider(email) {
+  exigirSupabase();
+  const e = String(email || '').trim().toLowerCase();
+  const { data, error } = await backend.sb.from('lideres').delete().eq('email', e).select();
+  if (error) throw new Error(error.message);
+  // Sem permissão o RLS não gera erro: apenas não deixa linha visível para
+  // apagar. Zero linhas é negativa, não sucesso — o mesmo cuidado de `remover`.
+  if (!data?.length) throw new Error('Não foi possível remover. Só o dono pode, e o dono não se remove.');
 }
 
 export async function sair() {
