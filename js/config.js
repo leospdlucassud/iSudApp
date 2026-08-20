@@ -266,11 +266,17 @@ export const MESES = [
 
 /**
  * Marcações fixas da semana missionária, como apareciam na grade da planilha.
- * `bloqueia` impede o agendamento; `aviso` só mostra a etiqueta.
+ *
+ * A chave é o dia da semana (0 = domingo). `bloqueia: true` tira o dia das
+ * vagas e mostra "—" no lugar do botão; `false` só pendura a etiqueta como
+ * aviso, e o dia continua agendável — a tela do almoço trata os dois casos.
+ *
+ * A terça trazia "Mesada da missão", herdada da planilha antiga. A missão não
+ * usa mais, e um aviso que não corresponde a nada só confunde quem escolhe o
+ * dia: removida em 20 de agosto de 2026.
  */
 export const MARCAS_SEMANA = {
-  1: { rotulo: 'P-Day',            bloqueia: true  },
-  2: { rotulo: 'Mesada da missão', bloqueia: false },
+  1: { rotulo: 'P-Day', bloqueia: true },
 };
 
 /** Faixas de horário para lições, como estavam na planilha de disponibilidade. */
