@@ -83,6 +83,21 @@
   --seq-5: #256abf;
   --seq-6: #184f95;
 
+  /* Tinta de cada degrau. Vem em par com a rampa porque o número do nível não
+     diz nada sobre luminosidade: no tema escuro a rampa inverte, e escolher a
+     tinta pelo nível deixava o número a 1,32:1 justamente nas células mais
+     cheias. Todos os pares abaixo passam de 4,5:1. */
+  --seq-tinta-0: #141009;
+  --seq-tinta-1: #141009;
+  --seq-tinta-2: #141009;
+  --seq-tinta-3: #141009;
+  --seq-tinta-4: #141009;
+  --seq-tinta-5: #ffffff;
+  --seq-tinta-6: #ffffff;
+
+  /* Realce suave da marca, em vez do dourado antigo cravado em rgba. */
+  --realce-suave: rgba(125, 95, 24, .13);
+
   /* Cromo do gráfico */
   --grade: #e7dfcd;
   --eixo:  #cdc2ab;
@@ -167,6 +182,17 @@
   --seq-5: #9ec5f4;
   --seq-6: #cde2fb;
 
+  /* A rampa inverte aqui, então a tinta inverte junto. */
+  --seq-tinta-0: #ffffff;
+  --seq-tinta-1: #ffffff;
+  --seq-tinta-2: #ffffff;
+  --seq-tinta-3: #0d1219;
+  --seq-tinta-4: #0d1219;
+  --seq-tinta-5: #0d1219;
+  --seq-tinta-6: #0d1219;
+
+  --realce-suave: rgba(232, 188, 99, .14);
+
   --grade: #2c2c2a;
   --eixo:  #383835;
   --tinta-eixo: #898781;
@@ -187,9 +213,13 @@
   --hdr-btn-texto:     var(--on-dark);
 }
 
-html { color-scheme: light dark; font-size: var(--fs); }
-[data-theme="dark"] html,
-html[data-theme="dark"] { color-scheme: dark; }
+html { font-size: var(--fs); }
+
+/* Fixado nos DOIS sentidos. Só o ramo escuro existia, então com o sistema em
+   escuro e o app em claro os controles nativos — e o app tem muito campo de
+   data — vinham escuros sobre o bege. */
+html[data-theme="light"] { color-scheme: light; }
+html[data-theme="dark"]  { color-scheme: dark; }
 
 body {
   font-family: var(--font);
@@ -392,7 +422,7 @@ a { color: var(--primary); }
 .tile__go    { flex: 0 0 auto; color: var(--text-3); font-size: 1.375rem; }
 
 /* Módulos restritos ganham o dourado da marca. */
-.tile--adm .tile__icon { background: rgba(217,164,65,.16); }
+.tile--adm .tile__icon { background: var(--realce-suave); }
 [data-theme="dark"] .tile--adm .tile__icon { background: rgba(232,188,99,.14); }
 .tile--adm:hover { border-color: var(--gold-dim); }
 
@@ -401,7 +431,7 @@ a { color: var(--primary); }
   margin-left: .4375rem;
   padding: .0625rem .375rem;
   border-radius: var(--r-pill);
-  background: rgba(217,164,65,.18);
+  background: var(--realce-suave);
   color: var(--warning);
   font-size: .625rem;
   font-weight: 700;

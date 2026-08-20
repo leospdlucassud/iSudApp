@@ -300,7 +300,10 @@ function painelSemana() {
           : Math.min(6, 1 + Math.floor((pessoas.length / maximo) * 5.999));
         const cel = el('button', {
           class: 'densidade', type: 'button',
-          style: `background:var(--seq-${nivel});color:${nivel >= 4 ? '#fff' : 'var(--text)'}`,
+          // A tinta vem em par com o degrau, definida por tema no CSS. Escolher
+          // pelo número do nível quebrava no tema escuro, onde a rampa inverte:
+          // o branco caía sobre azul claro e o número sumia a 1,32:1.
+          style: `background:var(--seq-${nivel});color:var(--seq-tinta-${nivel})`,
           'aria-label': `${dia.label}, ${h}: ${pessoas.length} disponível(is)`,
           disabled: !pessoas.length,
           onclick: () => listarPessoas(dia, h, pessoas),
