@@ -204,18 +204,23 @@ function painelLancamento() {
     onchange: (e) => { areaSel = e.target.value; pintar(); } },
     ...areas.map(a => el('option', { value: a.id, selected: a.id === area.id }, a.nome)));
 
-  // Cabeçalho de duas faixas: indicador em cima, C/H/T embaixo.
+  // Cabeçalho de duas faixas: indicador em cima, o desdobramento embaixo.
+  //
+  // Nome inteiro, nunca abreviação. "Liç.M", "N.Data" e o "H" de homens ADULTOS
+  // só faziam sentido para quem já conhecia a planilha antiga, e o `title` que
+  // os explicava não existe em celular. A classe .table--rotulos deixa o
+  // cabeçalho quebrar linha para o nome caber.
   const topo = el('tr', {}, el('th', { rowspan: 2 }, 'Domingo'));
   const base = el('tr', {});
   for (const ind of MANUAIS) {
     if (ind.split) {
-      topo.append(el('th', { colspan: 3, class: 'center' }, ind.abbr));
-      for (const sc of SUBCAMPOS) base.append(el('th', { class: 'center', title: sc.label }, sc.abbr));
+      topo.append(el('th', { colspan: 3, class: 'center' }, ind.label));
+      for (const sc of SUBCAMPOS) base.append(el('th', { class: 'center' }, sc.label));
     } else {
-      topo.append(el('th', { rowspan: 2, class: 'center', title: ind.label }, ind.abbr));
+      topo.append(el('th', { rowspan: 2, class: 'center' }, ind.label));
     }
   }
-  topo.append(el('th', { rowspan: 2, class: 'center', title: FREQUENCIA.label }, 'Freq. ala'));
+  topo.append(el('th', { rowspan: 2, class: 'center' }, FREQUENCIA.label));
 
   const corpo = el('tbody', {}, ...domingos.map(d => linhaLancamento(d, area)));
 
@@ -229,7 +234,7 @@ function painelLancamento() {
         el('span', { class: 'small muted' }, 'salva ao sair do campo'),
       ),
       el('div', { class: 'table-wrap' },
-        el('table', { class: 'table' }, el('thead', {}, topo, base), corpo)),
+        el('table', { class: 'table table--rotulos' }, el('thead', {}, topo, base), corpo)),
     ),
     el('div', { class: 'card' },
       el('div', { class: 'card__head' }, el('span', { class: 'card__title' }, 'Derivados — não se digita aqui')),
@@ -322,13 +327,13 @@ function painelConsolidado() {
   const base = el('tr', {});
   for (const ind of INDICADORES) {
     if (ind.split) {
-      topo.append(el('th', { colspan: 3, class: 'center' }, ind.abbr));
-      for (const sc of SUBCAMPOS) base.append(el('th', { class: 'center' }, sc.abbr));
+      topo.append(el('th', { colspan: 3, class: 'center' }, ind.label));
+      for (const sc of SUBCAMPOS) base.append(el('th', { class: 'center' }, sc.label));
     } else {
-      topo.append(el('th', { rowspan: 2, class: 'center', title: ind.label }, ind.abbr));
+      topo.append(el('th', { rowspan: 2, class: 'center' }, ind.label));
     }
   }
-  topo.append(el('th', { rowspan: 2, class: 'center' }, 'Freq. ala'));
+  topo.append(el('th', { rowspan: 2, class: 'center' }, FREQUENCIA.label));
 
   const celulas = (d) => {
     const tds = [];
@@ -363,7 +368,7 @@ function painelConsolidado() {
         el('button', { class: 'btn btn--ghost btn--sm', type: 'button', onclick: exportarCSV }, '⬇ CSV'),
       ),
       el('div', { class: 'table-wrap' },
-        el('table', { class: 'table' },
+        el('table', { class: 'table table--rotulos' },
           el('thead', {}, topo, base),
           el('tbody', {}, ...domingos.map(d => el('tr', {}, el('td', { class: 'nowrap' }, dataCurta(d)), ...celulas(d)))),
           el('tfoot', {}, rodape),
@@ -372,9 +377,9 @@ function painelConsolidado() {
     el('div', { class: 'card' },
       el('div', { class: 'card__head' }, el('span', { class: 'card__title' }, 'Por área no mês')),
       el('div', { class: 'table-wrap' },
-        el('table', { class: 'table' },
+        el('table', { class: 'table table--rotulos' },
           el('thead', {}, el('tr', {}, el('th', {}, 'Área'),
-            ...INDICADORES.map(i => el('th', { class: 'center', title: i.label }, i.abbr)))),
+            ...INDICADORES.map(i => el('th', { class: 'center' }, i.label)))),
           el('tbody', {}, ...areas.map(a => el('tr', {},
             el('td', {}, el('span', { class: 'dot', style: `background:${corDaArea(a.cor ?? 0)};margin-right:.5rem` }), a.nome),
             ...INDICADORES.map(i =>

@@ -96,17 +96,17 @@ export const corDaArea = (i) => `var(--area-${i % 8})`;
  * `licoesmembro` e não casaria com o que o cliente manda.
  */
 export const INDICADORES = [
-  { key: 'referencias',       label: 'Referências de Membro',         abbr: 'Ref.',   split: false, soma: true },
-  { key: 'licoes_membro',     label: 'Lições com Membros',            abbr: 'Liç.M',  split: false, soma: true, pmg: 2 },
-  { key: 'outras_licoes',     label: 'Outras Lições',                 abbr: 'Out.L',  split: false, soma: true },
-  { key: 'novas_pessoas',     label: 'Novas Pessoas Sendo Ensinadas', abbr: 'Novas',  split: true,  soma: true, pmg: 1, legado: 'Novos Pesquisadores' },
-  { key: 'novos_com_data',    label: 'Novos com Data de Batismo',     abbr: 'N.Data', split: true,  soma: true },
-  { key: 'total_com_data',    label: 'Total com Data de Batismo',     abbr: 'T.Data', split: true,  soma: true, pmg: 4, legado: 'Total Pesq C/ Data' },
-  { key: 'sacramental',       label: 'Assistiram à Sacramental',      abbr: 'Sacr.',  split: false, soma: true, pmg: 3 },
-  { key: 'progredindo',       label: 'Progredindo',                   abbr: 'Prog.',  split: false, soma: true, derivado: 'lista nominal de progredindo' },
-  { key: 'batismos',          label: 'Batismos',                      abbr: 'Bat.',   split: true,  soma: true, pmg: 5, derivado: 'registro de batismos' },
-  { key: 'confirmacoes',      label: 'Confirmações',                  abbr: 'Conf.',  split: true,  soma: true, pmg: 5, derivado: 'registro de batismos' },
-  { key: 'novos_sacramental', label: 'Membros Novos na Sacramental',  abbr: 'M.Nov',  split: false, soma: true, pmg: 6, derivado: 'caminho do convênio' },
+  { key: 'referencias',       label: 'Referências de Membro',         split: false, soma: true },
+  { key: 'licoes_membro',     label: 'Lições com Membros',            split: false, soma: true, pmg: 2 },
+  { key: 'outras_licoes',     label: 'Outras Lições',                 split: false, soma: true },
+  { key: 'novas_pessoas',     label: 'Novas Pessoas Sendo Ensinadas', split: true,  soma: true, pmg: 1, legado: 'Novos Pesquisadores' },
+  { key: 'novos_com_data',    label: 'Novos com Data de Batismo',     split: true,  soma: true },
+  { key: 'total_com_data',    label: 'Total com Data de Batismo',     split: true,  soma: true, pmg: 4, legado: 'Total Pesq C/ Data' },
+  { key: 'sacramental',       label: 'Assistiram à Sacramental',      split: false, soma: true, pmg: 3 },
+  { key: 'progredindo',       label: 'Progredindo',                   split: false, soma: true, derivado: 'lista nominal de progredindo' },
+  { key: 'batismos',          label: 'Batismos',                      split: true,  soma: true, pmg: 5, derivado: 'registro de batismos' },
+  { key: 'confirmacoes',      label: 'Confirmações',                  split: true,  soma: true, pmg: 5, derivado: 'registro de batismos' },
+  { key: 'novos_sacramental', label: 'Membros Novos na Sacramental',  split: false, soma: true, pmg: 6, derivado: 'caminho do convênio' },
 ];
 
 /**
@@ -117,7 +117,6 @@ export const INDICADORES = [
 export const FREQUENCIA = {
   key: 'frequencia',
   label: 'Frequência Sacramental da Ala',
-  abbr: 'Freq.',
   escopo: 'ala',
   soma: false,
 };
@@ -129,9 +128,9 @@ export const FREQUENCIA = {
  * não sexo masculino. Um menino de 8 anos conta em Total e zero em Homens.
  */
 export const SUBCAMPOS = [
-  { key: 'casados', label: 'Casados',        abbr: 'C' },
-  { key: 'homens',  label: 'Homens adultos', abbr: 'H' },
-  { key: 'total',   label: 'Total',          abbr: 'T' },
+  { key: 'casados', label: 'Casados' },
+  { key: 'homens',  label: 'Homens adultos' },
+  { key: 'total',   label: 'Total' },
 ];
 
 export const indicadorPorKey = Object.fromEntries(INDICADORES.map(i => [i.key, i]));

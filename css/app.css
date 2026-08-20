@@ -596,6 +596,18 @@ a { color: var(--primary); }
 .table--grade td { padding: .1875rem; }
 .table--grade th { font-size: .6875rem; }
 
+/* Tabelas do Relatório: o cabeçalho traz o nome inteiro do indicador, e sem
+   soltar o `nowrap` de .table th cada nome esticaria a coluna até a tabela
+   ocupar várias telas de largura. O alinhamento pelo pé mantém a última linha
+   do nome rente aos números, mesmo com cabeçalhos de alturas diferentes. */
+.table--rotulos thead th {
+  white-space: normal;
+  vertical-align: bottom;
+  line-height: 1.3;
+  min-width: 5.5rem;
+  max-width: 9rem;
+}
+
 .slot, .densidade {
   display: grid; place-items: center;
   width: 100%; min-width: 2.75rem; height: 2.25rem;

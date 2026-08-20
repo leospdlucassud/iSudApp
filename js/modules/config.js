@@ -446,18 +446,6 @@ function painelDados() {
         resultado,
       ),
     ),
-
-    el('div', { class: 'card' },
-      el('div', { class: 'card__head' }, el('span', { class: 'card__title' }, 'Importar voluntários de almoço')),
-      el('div', { class: 'card__body' },
-        el('p', { class: 'small muted', style: 'margin-bottom:.75rem' },
-          'Salve a aba "Lista" da planilha de voluntários como CSV e envie aqui. ' +
-          'Espera as colunas: Nome; Telefone; Endereço; Duplas; Observações — nessa ordem, ' +
-          'com a primeira linha de cabeçalho.'),
-        el('input', { class: 'input', type: 'file', accept: '.csv,text/csv',
-          onchange: (e) => importarVoluntarios(e.target.files[0], resultado) }),
-      ),
-    ),
   );
 }
 
@@ -536,66 +524,4 @@ async function restaurar(saida) {
     el('p', { style: 'font-weight:600;margin-bottom:.375rem' }, 'Restauração concluída'),
     ...resumo.map(t => el('p', { class: 'small muted' }, t)),
   );
-}
-
-/** CSV simples: separador ; ou , com aspas opcionais. */
-function lerCSV(texto) {
-  const sep = (texto.split('\n')[0].match(/;/g)?.length ?? 0) >= (texto.split('\n')[0].match(/,/g)?.length ?? 0) ? ';' : ',';
-  const linhas = [];
-  let campo = '', linha = [], dentroDeAspas = false;
-
-  for (let i = 0; i < texto.length; i++) {
-    const c = texto[i];
-    if (dentroDeAspas) {
-      if (c === '"' && texto[i + 1] === '"') { campo += '"'; i++; }
-      else if (c === '"') dentroDeAspas = false;
-      else campo += c;
-    } else if (c === '"') dentroDeAspas = true;
-    else if (c === sep) { linha.push(campo); campo = ''; }
-    else if (c === '\n') { linha.push(campo); linhas.push(linha); linha = []; campo = ''; }
-    else if (c !== '\r') campo += c;
-  }
-  if (campo || linha.length) { linha.push(campo); linhas.push(linha); }
-  return linhas.filter(l => l.some(x => x.trim()));
-}
-
-async function importarVoluntarios(arquivo, saida) {
-  if (!arquivo) return;
-  saida.replaceChildren(el('p', { class: 'small muted' }, 'Lendo o arquivo…'));
-
-  const linhas = lerCSV(await arquivo.text());
-  if (linhas.length < 2) {
-    saida.replaceChildren(el('p', { style: 'color:var(--danger)' }, 'O arquivo não tem linhas de dados.'));
-    return;
-  }
-
-  const existentes = new Set((await ctx.db.listar('voluntarios_almoco')).map(v => v.nome.trim().toLowerCase()));
-  let gravados = 0, pulados = 0;
-
-  for (const l of linhas.slice(1)) {
-    const [nome, telefone, endereco, duplasTxt, observacoes] = l.map(x => (x ?? '').trim());
-    if (!nome || nome.length < 2) { pulados++; continue; }
-    if (existentes.has(nome.toLowerCase())) { pulados++; continue; }
-
-    try {
-      await ctx.db.inserir('voluntarios_almoco', {
-        nome,
-        telefone: telefone || null,
-        endereco: endereco || null,
-        duplas: Math.min(4, Math.max(1, parseInt(duplasTxt, 10) || 1)),
-        modalidade: /pix/i.test(observacoes || '') ? 'pix'
-          : /quentinha/i.test(observacoes || '') ? 'quentinha' : 'presencial',
-        periodicidade: 'livre',
-        observacoes: observacoes || null,
-      });
-      existentes.add(nome.toLowerCase());
-      gravados++;
-    } catch { pulados++; }
-  }
-
-  saida.replaceChildren(
-    el('p', { class: 'small' }, `${gravados} voluntário(s) importado(s).`),
-    pulados ? el('p', { class: 'small muted' }, `${pulados} linha(s) pulada(s) — sem nome ou já cadastradas.`) : null,
-  );
-  toast(`${gravados} importado(s).`, 'ok');
 }
