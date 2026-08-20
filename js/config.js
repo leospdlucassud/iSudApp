@@ -68,7 +68,7 @@ export const INDICADORES = [
   { key: 'sacramental',       label: 'Assistiram à Sacramental',      abbr: 'Sacr.',  split: false, soma: true, pmg: 3 },
   { key: 'progredindo',       label: 'Progredindo',                   abbr: 'Prog.',  split: false, soma: true, derivado: 'lista nominal de progredindo' },
   { key: 'batismos',          label: 'Batismos',                      abbr: 'Bat.',   split: true,  soma: true, pmg: 5, derivado: 'registro de batismos' },
-  { key: 'confirmacoes',      label: 'Confirmações',                  abbr: 'Conf.',  split: true,  soma: true, pmg: 5 },
+  { key: 'confirmacoes',      label: 'Confirmações',                  abbr: 'Conf.',  split: true,  soma: true, pmg: 5, derivado: 'registro de batismos' },
   { key: 'novos_sacramental', label: 'Membros Novos na Sacramental',  abbr: 'M.Nov',  split: false, soma: true, pmg: 6, derivado: 'caminho do convênio' },
 ];
 

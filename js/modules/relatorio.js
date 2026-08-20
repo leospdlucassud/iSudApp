@@ -396,7 +396,9 @@ function exportarCSV() {
 
   const linhasCSV = [];
   for (const d of domingos) {
-    for (const a of [...areas, { id: null, nome: 'ALA QUEIMADOS' }]) {
+    // Linha do consolidado. O nome vem de ALA — ficou para trás na troca de
+    // identidade porque só aparece no CSV, nunca na tela.
+    for (const a of [...areas, { id: null, nome: ALA.nome.toUpperCase() }]) {
       const ler = (k, s) => (a.id ? valor(d, a.id, k, s) : valorAla(d, k, s));
       const linha = [dataCurta(d), a.nome];
       for (const ind of INDICADORES) {

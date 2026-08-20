@@ -164,7 +164,15 @@ export function modal({ titulo, corpo, confirmar = 'Salvar', cancelar = 'Cancela
 
     document.body.append(overlay);
     modalAberto = { overlay, encerrar };
-    setTimeout(() => $('input, select, textarea, button', box)?.focus(), 60);
+    // O primeiro campo, não o '✕'. A busca antiga varria o box inteiro em
+    // ordem de documento e o botão de fechar, que vive no cabeçalho, vinha
+    // antes — quem apertava Enter achando que confirmava descartava o
+    // formulário.
+    setTimeout(() => {
+      const alvo = $('.modal__body input, .modal__body select, .modal__body textarea', box)
+        || btnOk || btnCancel || btnFechar;
+      alvo?.focus();
+    }, 60);
   });
 }
 

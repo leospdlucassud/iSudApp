@@ -404,7 +404,10 @@ function exportarCSV() {
 --------------------------------------------------------------------------- */
 
 function painelAgenda() {
-  const dias = diasDoMes(ano, mes).filter(d => d.data >= hoje().slice(0, 8) + '01');
+  // Mês inteiro. O filtro anterior comparava com o primeiro dia do mês
+  // CORRENTE, não do exibido, então navegar para trás esvaziava a tabela.
+  // Dia passado já vem esmaecido e sem o botão de marcar.
+  const dias = diasDoMes(ano, mes);
   const doMes = agenda.filter(a => a.data.startsWith(`${ano}-${String(mes + 1).padStart(2, '0')}`));
 
   const mudarMes = (passo) => {

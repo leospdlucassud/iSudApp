@@ -58,12 +58,16 @@ export function alertasDoCaminho(p, marcos, frequencias) {
     out.push({ tom: 'warn', texto: 'Mais de 6 meses sem chamado' });
   }
 
-  const ausencias = frequencias
-    .filter(f => f.pessoa_id === p.id && f.presente === false)
-    .map(f => f.domingo)
-    .sort()
+  // A janela vem dos domingos REGISTRADOS e só depois se exige que os três
+  // sejam falta. Filtrar as ausências antes de cortar fazia três faltas em
+  // qualquer ponto do histórico acenderem o alerta para sempre, mesmo com
+  // presenças no meio e depois — o texto prometia "os 3 últimos" e entregava
+  // "3 em qualquer lugar".
+  const ultimos = frequencias
+    .filter(f => f.pessoa_id === p.id && typeof f.presente === 'boolean')
+    .sort((a, b) => String(a.domingo).localeCompare(String(b.domingo)))
     .slice(-3);
-  if (ausencias.length === 3) {
+  if (ultimos.length === 3 && ultimos.every(f => f.presente === false)) {
     out.push({ tom: 'warn', texto: 'Faltou nos 3 últimos domingos registrados' });
   }
 
