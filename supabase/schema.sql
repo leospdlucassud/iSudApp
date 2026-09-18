@@ -95,9 +95,13 @@ create table if not exists public.areas (
 
 -- Áreas de partida. O LMA cria, renomeia e desativa pela tela de
 -- Configurações; isto aqui só garante que o app não abra sem nenhuma.
+--
+-- `do nothing` e não `do update`: rodar o schema de novo não pode desfazer um
+-- nome que o LMA mudou pelo app. Por isso trocar estes nomes aqui só vale para
+-- banco novo — num banco que já tem as áreas, renomeie em Configurações.
 insert into public.areas (id, nome, cor, ordem) values
-  ('area1', 'Área 1', 0, 1),
-  ('area2', 'Área 2', 1, 2)
+  ('area1', 'Palmas 4 Norte', 0, 1),
+  ('area2', 'Palmas 4 Sul',   1, 2)
 on conflict (id) do nothing;
 
 -- Duplas de missionários por área e mês — os nomes que apareciam no cabeçalho

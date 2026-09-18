@@ -70,10 +70,13 @@ export const CODIGO_POR_EMAIL = false;
  * estiver vazia, para o app não abrir quebrado antes da configuração — mas
  * elas não existem no banco. Em Configurações a lista mostra o que está
  * gravado de verdade, com um botão para criar estas.
+ *
+ * Os identificadores continuam `area1` e `area2` de propósito: todo o
+ * histórico lançado aponta para eles. Só o nome de exibição acompanha a ala.
  */
 export const AREAS_PADRAO = [
-  { id: 'area1', nome: 'Área 1', cor: 0, ordem: 1, ativa: true },
-  { id: 'area2', nome: 'Área 2', cor: 1, ordem: 2, ativa: true },
+  { id: 'area1', nome: 'Palmas 4 Norte', cor: 0, ordem: 1, ativa: true },
+  { id: 'area2', nome: 'Palmas 4 Sul',   cor: 1, ordem: 2, ativa: true },
 ];
 
 /** Slot categórico fixo. A cor segue a entidade, nunca a posição na lista. */
