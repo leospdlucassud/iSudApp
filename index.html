@@ -11,6 +11,24 @@
 <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <link rel="stylesheet" href="/css/app.css">
+
+<!--
+  Achata a cascata de carregamento.
+
+  Sem estas linhas o navegador só descobria a biblioteca do Supabase — 206 KB,
+  de longe o maior arquivo do app — depois de baixar e avaliar app.js, db.js e
+  supabase-config.js, um de cada vez. Eram quatro idas à rede em fila antes de
+  a primeira tela poder existir. Declaradas aqui, todas partem juntas.
+
+  Mudou a lista de módulos que o app.js importa de saída? Atualize aqui.
+-->
+<link rel="preload" href="/js/vendor/supabase.js" as="script">
+<link rel="modulepreload" href="/js/app.js">
+<link rel="modulepreload" href="/js/config.js">
+<link rel="modulepreload" href="/js/db.js">
+<link rel="modulepreload" href="/js/ui.js">
+<link rel="modulepreload" href="/js/util.js">
+<link rel="modulepreload" href="/js/modules/inicio.js">
 <script>
   // Antes da primeira pintura, para não piscar branco no tema escuro.
   (() => {
@@ -67,9 +85,21 @@
 
 <nav class="nav" id="nav" aria-label="Módulos"></nav>
 
-<main class="main" id="conteudo" tabindex="-1"></main>
+<main class="main" id="conteudo" tabindex="-1">
+  <!--
+    Pintado junto com o cabeçalho, antes de qualquer JavaScript. É o que a
+    pessoa vê enquanto o app baixa os módulos e fala com o banco; o app troca
+    isto pela tela de verdade assim que ela existe. O CSS só o revela depois de
+    300ms, então numa conexão boa ele nunca chega a aparecer.
+  -->
+  <div class="carregando" role="status" aria-live="polite">
+    <span class="carregando__giro" aria-hidden="true"></span><span>Carregando…</span>
+  </div>
+</main>
 
 <noscript>
+  <!-- Sem JavaScript nada vai carregar: um giro eterno seria mentira. -->
+  <style>.carregando { display: none; }</style>
   <div class="main">
     <div class="card"><div class="card__body">
       Este aplicativo precisa de JavaScript ativado para funcionar.

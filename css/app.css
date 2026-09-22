@@ -731,6 +731,40 @@ code {
 }
 @keyframes shimmer { to { background-position: -200% 0; } }
 
+/* Carregando
+   ---------------------------------------------------------------------------
+   O atraso de 300ms é o ponto todo: numa conexão boa a tela de verdade chega
+   antes disso e a pessoa nunca vê o giro, então trocar de aba não pisca. Numa
+   conexão ruim ele aparece sozinho e diz que o app está trabalhando.
+
+   A mesma marcação existe estática no index.html, para o aviso valer já na
+   primeira pintura, antes de qualquer JavaScript rodar. */
+.carregando {
+  display: flex; align-items: center; justify-content: center; gap: .625rem;
+  padding: 3rem 1rem;
+  color: var(--text-2);
+  font-size: .875rem;
+  opacity: 0;
+  animation: surgir .25s ease .3s forwards;
+}
+.carregando__giro {
+  flex: 0 0 auto;
+  width: 1.25rem; height: 1.25rem;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: girar .7s linear infinite;
+}
+@keyframes girar  { to { transform: rotate(360deg); } }
+@keyframes surgir { to { opacity: 1; } }
+
+/* Sem movimento: o giro é o único sinal de que algo acontece, então ele fica —
+   só mais lento, e sem o aparecimento gradual. */
+@media (prefers-reduced-motion: reduce) {
+  .carregando { animation: none; opacity: 1; }
+  .carregando__giro { animation-duration: 1.8s; }
+}
+
 /* Estado da conexão em tempo real */
 .conn {
   display: inline-flex; align-items: center; gap: .375rem;

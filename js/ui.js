@@ -227,10 +227,21 @@ export function vazio(titulo, mensagem, icone = '📭') {
   );
 }
 
-export function carregando(linhas = 3) {
-  return el('div', { class: 'stack' },
-    ...Array.from({ length: linhas }, () =>
-      el('div', { class: 'skeleton', style: 'height:2.75rem' })),
+/**
+ * Indicador de carregamento, usado por toda tela que espera o banco.
+ *
+ * Era um esqueleto de três barras cinzentas, que numa tela ainda vazia lia
+ * como "acabou e não veio nada" em vez de "está vindo". Um giro com a palavra
+ * escrita não deixa dúvida.
+ *
+ * Quem segura a aparição por 300ms é o CSS, não o JavaScript: em conexão boa a
+ * tela de verdade chega antes disso e ninguém vê piscar; em conexão ruim, o
+ * aviso aparece sozinho.
+ */
+export function carregando(texto = 'Carregando…') {
+  return el('div', { class: 'carregando', role: 'status', 'aria-live': 'polite' },
+    el('span', { class: 'carregando__giro', 'aria-hidden': 'true' }),
+    el('span', {}, texto),
   );
 }
 

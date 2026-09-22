@@ -361,18 +361,24 @@ async function montarModulo() {
     // Uma rota mais nova pode ter começado enquanto o import resolvia.
     if (rota.modulo !== id) return;
 
+    // O módulo recebe um contêiner próprio — ele repinta a si mesmo com
+    // replaceChildren e não pode levar o botão de voltar junto — e monta FORA
+    // da página, entrando só quando termina.
+    //
+    // Antes o contêiner entrava vazio e o "Carregando…" saía no mesmo
+    // instante, então a faixa ficava em branco justamente durante a parte
+    // lenta: as consultas que o módulo faz ao banco dentro de montar().
+    const host = el('div');
+    await mod.montar(host, { db, irPara, entrarComoAdmin });
+    if (rota.modulo !== id) return;
+
     alvo.replaceChildren();
     if (id !== INICIO && !db.ehAdmin()) {
       alvo.append(el('button', {
         class: 'voltar', type: 'button', onclick: () => irPara(INICIO),
       }, '‹ Início'));
     }
-
-    // O módulo recebe um contêiner próprio: ele repinta a si mesmo com
-    // replaceChildren e não pode levar o botão de voltar junto.
-    const host = el('div');
     alvo.append(host);
-    await mod.montar(host, { db, irPara, entrarComoAdmin });
   } catch (err) {
     if (rota.modulo !== id) return;
     console.error(`[${id}]`, err);
@@ -391,6 +397,10 @@ async function montarModulo() {
 
 async function iniciar() {
   ligarCabecalho();
+  // O "Carregando…" desta espera vem pintado do index.html: ele aparece junto
+  // com o cabeçalho, antes de qualquer módulo ser avaliado. db.iniciar() baixa
+  // a biblioteca do Supabase e fala com o servidor, e era aqui que a tela
+  // ficava em branco.
   await db.iniciar();
   pintarPapel();
 

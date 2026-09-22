@@ -6,7 +6,7 @@
  * pior do que erro de conexão.
  */
 
-const CACHE = 'om-v6';
+const CACHE = 'om-v7';
 
 const CASCA = [
   '/',
@@ -59,6 +59,28 @@ self.addEventListener('fetch', (e) => {
           return r;
         })
         .catch(() => caches.match('/index.html')),
+    );
+    return;
+  }
+
+  // Biblioteca do Supabase: cache primeiro.
+  //
+  // São 206 KB de build de terceiro versionado junto com o app — o arquivo
+  // mais pesado que existe aqui e o que menos muda. Na estratégia de rede
+  // primeiro, abaixo, ele era rebaixado inteiro a cada abertura do app, e era
+  // isso que segurava a primeira tela em conexão lenta.
+  //
+  // O preço é explícito: ele só volta pela rede quando o cache troca de nome.
+  // TROCAR QUALQUER ARQUIVO EM /js/vendor/ EXIGE SUBIR A VERSÃO EM `CACHE`.
+  if (url.pathname.startsWith('/js/vendor/')) {
+    e.respondWith(
+      caches.match(request).then(guardado => guardado || fetch(request).then((r) => {
+        if (r.ok) {
+          const copia = r.clone();
+          caches.open(CACHE).then(c => c.put(request, copia));
+        }
+        return r;
+      })),
     );
     return;
   }

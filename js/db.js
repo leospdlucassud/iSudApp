@@ -256,10 +256,16 @@ async function backendSupabase(url, anonKey) {
     async iniciar() {
       // Sonda uma tabela conhecida: sem o schema.sql aplicado, o PostgREST
       // responde PGRST205 e todo módulo quebraria com erro incompreensível.
-      const sonda = await sb.from('areas').select('id').limit(1);
+      //
+      // Em paralelo com a sessão, que não depende dela. Em série eram duas
+      // idas ao servidor enfileiradas antes da primeira tela aparecer.
+      const [sonda, resposta] = await Promise.all([
+        sb.from('areas').select('id').limit(1),
+        sb.auth.getSession(),
+      ]);
       schemaOk = !(sonda.error && sonda.error.code === 'PGRST205');
 
-      sessao = (await sb.auth.getSession()).data.session;
+      sessao = resposta.data.session;
       await resolverLider();
       sb.auth.onAuthStateChange(async (evento, s) => {
         sessao = s;
@@ -414,7 +420,18 @@ export async function iniciar() {
   }
 
   backend ??= backendLocal();
-  await backend.iniciar();
+
+  // A partida do backend não pode derrubar a partida do app. Se ela lança, o
+  // `await db.iniciar()` lá no app.js nunca retorna e a tela fica girando para
+  // sempre — antes do indicador de carregamento isso era uma faixa em branco
+  // eterna, igualmente sem saída. A tela de "sem conexão" existe justamente
+  // para este caso, e traz o botão de tentar de novo.
+  try {
+    await backend.iniciar();
+  } catch (err) {
+    falhaAoConectar = err?.message || 'Falha ao iniciar o banco de dados.';
+    console.error('[db] falha ao iniciar o backend:', err);
+  }
   return backend.nome;
 }
 
