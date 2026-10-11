@@ -7,7 +7,11 @@
  *  - grade e eixos em fio de 1px sólido, recessivos;
  *  - texto sempre em tinta, nunca na cor da série — a identidade vem da marca
  *    colorida ao lado;
- *  - legenda sempre presente a partir de duas séries;
+ *  - legenda sempre presente a partir de duas séries — e clicável: passar
+ *    o dedo ou o mouse num item destaca aquela série e apaga as outras;
+ *  - a paleta tem oito cores validadas e nunca se gera uma nona. Série que
+ *    precisa repetir cor repete com traço tracejado, e a legenda mostra o
+ *    tracejado também;
  *  - todo gráfico tem gêmeo em tabela, porque três slots da paleta ficam
  *    abaixo de 3:1 no tema claro.
  */
@@ -80,15 +84,19 @@ const esconderDica = () => { if (dica) dica.style.display = 'none'; };
 
 const tituloDica = (texto) => el('b', { class: 'viz-dica__titulo' }, texto);
 
-const chaveDica = (cor, rotulo, valor) =>
+/**
+ * Linha da dica. A chave é um traço curto, não um quadrado: o que ela
+ * identifica é uma linha, e um bloco cheio pesa mais que o rótulo ao lado.
+ */
+const chaveDica = (serie, valor) =>
   el('span', { class: 'viz-dica__linha' },
-    el('span', { class: 'viz-dica__chave', style: `background:${cor}` }),
-    el('span', {}, rotulo),
+    el('span', {
+      class: `viz-dica__chave${serie.tracejado ? ' viz-dica__chave--tracejada' : ''}`,
+      style: `--cor:${serie.cor}`,
+    }),
+    el('span', {}, serie.nome),
     el('b', {}, valor),
   );
-
-const totalDica = (rotulo, valor) =>
-  el('span', { class: 'viz-dica__total' }, rotulo, el('b', {}, valor));
 
 /* ==========================================================================
    Moldura: título, legenda, gráfico e o gêmeo em tabela
@@ -99,7 +107,7 @@ const totalDica = (rotulo, valor) =>
  * @param {string} o.titulo
  * @param {string} [o.descricao]
  * @param {Node} o.figura      o SVG
- * @param {{nome:string,cor:string}[]} [o.series]  legenda; a partir de 2 é obrigatória
+ * @param {{nome:string,cor:string,tracejado?:boolean}[]} [o.series]  legenda; a partir de 2 é obrigatória
  * @param {() => Node} [o.tabela]  gêmeo acessível, montado sob demanda
  * @param {Node} [o.acoes]
  */
@@ -125,20 +133,69 @@ export function moldura({ titulo, descricao, figura, series = [], tabela, acoes 
       ),
       el('div', { class: 'row' }, acoes, alternar),
     ),
-    series.length >= 2 && el('div', { class: 'viz__legenda' },
-      ...series.map(x => el('span', { class: 'viz__item' },
-        el('span', { class: 'viz__chave', style: `background:${x.cor}` }),
-        x.nome,
-      )),
-    ),
+    series.length >= 2 && legenda(series, figura),
     el('div', { class: 'card__body' }, painel),
   );
 }
 
-/** Tabela genérica a partir de cabeçalhos e linhas. */
-export function tabelaSimples(cabecalhos, linhas) {
+/**
+ * Legenda que também é controle de destaque.
+ *
+ * Passar o mouse (ou o foco do teclado) num item acende aquela série e apaga
+ * as outras; tocar fixa o destaque, e tocar de novo solta. É a forma de ler
+ * um gráfico com muitas linhas sem esconder nenhuma — nada some, o resto só
+ * recua. Os valores de todas continuam na dica e na tabela.
+ *
+ * Só vira botão quando a figura tem marcas com `data-serie`; num gráfico sem
+ * isso (ou no aviso de vazio) a legenda segue estática.
+ */
+function legenda(series, figura) {
+  const chave = (x) => el('span', {
+    class: `viz__chave${x.tracejado ? ' viz__chave--tracejada' : ''}`,
+    style: `--cor:${x.cor}`,
+  });
+
+  const interativa = !!figura?.querySelector?.('[data-serie]');
+  if (!interativa) {
+    return el('div', { class: 'viz__legenda' },
+      ...series.map(x => el('span', { class: 'viz__item' }, chave(x), x.nome)));
+  }
+
+  let fixado = null;
+  const botoes = [];
+  const destacar = (i) => {
+    for (const m of figura.querySelectorAll('[data-serie]')) {
+      m.classList.toggle('viz__serie--apagada', i != null && m.dataset.serie !== String(i));
+    }
+  };
+  const soltarPara = () => destacar(fixado);
+
+  series.forEach((x, i) => {
+    botoes.push(el('button', {
+      class: 'viz__item viz__item--botao', type: 'button', 'aria-pressed': 'false',
+      title: `Destacar ${x.nome}`,
+      onmouseenter: () => destacar(i),
+      onmouseleave: soltarPara,
+      onfocus: () => destacar(i),
+      onblur: soltarPara,
+      onclick: () => {
+        fixado = fixado === i ? null : i;
+        botoes.forEach((b, k) => b.setAttribute('aria-pressed', String(k === fixado)));
+        destacar(fixado);
+      },
+    }, chave(x), x.nome));
+  });
+
+  return el('div', { class: 'viz__legenda', role: 'group', 'aria-label': 'Destacar série' }, ...botoes);
+}
+
+/**
+ * Tabela genérica a partir de cabeçalhos e linhas.
+ * @param {{rotulosLongos?: boolean}} [o] cabeçalhos que precisam quebrar linha
+ */
+export function tabelaSimples(cabecalhos, linhas, { rotulosLongos = false } = {}) {
   return el('div', { class: 'table-wrap' },
-    el('table', { class: 'table' },
+    el('table', { class: rotulosLongos ? 'table table--rotulos' : 'table' },
       el('thead', {}, el('tr', {}, ...cabecalhos.map(h => el('th', {}, h)))),
       el('tbody', {}, ...linhas.map(l =>
         el('tr', {}, ...l.map((c, i) => el('td', { class: i ? 'num' : '' }, c))))),
@@ -152,10 +209,13 @@ export function tabelaSimples(cabecalhos, linhas) {
 /**
  * @param {object} o
  * @param {string[]} o.categorias  rótulos do eixo X
- * @param {{nome:string,cor:string,valores:number[]}[]} o.series
+ * @param {{nome:string,cor:string,valores:number[],tracejado?:boolean}[]} o.series
  * @param {number} [o.altura]
+ * @param {boolean} [o.marcadores]  ponto em todo valor, não só no último.
+ *   Para séries curtas e esparsas — doze meses de batismos —, em que a linha
+ *   sozinha não deixa ver onde está cada mês.
  */
-export function linhas({ categorias, series, altura = 260 }) {
+export function linhas({ categorias, series, altura = 260, marcadores = false }) {
   const L = 46, R = 16, T = 12, B = 34;
   // 22px por ponto acomoda um ano inteiro (52 domingos) com rolagem curta.
   const W = Math.max(560, categorias.length * 22 + L + R);
@@ -182,28 +242,37 @@ export function linhas({ categorias, series, altura = 260 }) {
   }
   svg.append(s('line', { x1: L, x2: W - R, y1: y(0), y2: y(0), stroke: 'var(--eixo)', 'stroke-width': 1 }));
 
-  // Rótulos do eixo X — desbasta quando não cabe
-  const salto = Math.ceil(categorias.length / Math.floor(pw / 52));
+  // Rótulos do eixo X — desbasta quando não cabe.
+  //
+  // A largura sai do maior rótulo, não de um valor fixo. Era 52px por rótulo,
+  // medida para "dd/mm"; com meses ("Jan") a conta cortava um mês sim, outro
+  // não, e o último mês do ano corrente sumia do eixo.
+  const larguraRotulo = Math.max(...categorias.map(c => String(c).length)) * 6.5 + 14;
+  const salto = Math.max(1, Math.ceil(categorias.length / Math.max(1, Math.floor(pw / larguraRotulo))));
   categorias.forEach((c, i) => {
     if (i % salto) return;
     svg.append(s('text', { x: x(i), y: H - 12, 'text-anchor': 'middle', class: 'viz__tick' }, c));
   });
 
-  // Séries
-  for (const serie of series) {
+  // Séries. Cada marca leva `data-serie` para a legenda poder destacá-la.
+  series.forEach((serie, k) => {
+    const g = s('g', { class: 'viz__serie', 'data-serie': k });
     const d = serie.valores.map((v, i) => `${i ? 'L' : 'M'}${x(i)} ${y(v)}`).join(' ');
-    svg.append(s('path', {
+    g.append(s('path', {
       d, fill: 'none', stroke: serie.cor, 'stroke-width': 2,
-      'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+      'stroke-linejoin': 'round', 'stroke-linecap': serie.tracejado ? 'butt' : 'round',
+      'stroke-dasharray': serie.tracejado ? '6 4' : null,
     }));
-    const ult = serie.valores.length - 1;
-    if (ult >= 0) {
-      svg.append(s('circle', {
-        cx: x(ult), cy: y(serie.valores[ult]), r: 4,
+    const pontos = marcadores ? serie.valores.map((_, i) => i) : [serie.valores.length - 1];
+    for (const i of pontos) {
+      if (i < 0) continue;
+      g.append(s('circle', {
+        cx: x(i), cy: y(serie.valores[i]), r: 4,
         fill: serie.cor, stroke: 'var(--surface)', 'stroke-width': 2,
       }));
     }
-  }
+    svg.append(g);
+  });
 
   svg.append(camadaDeFoco({ svg, L, T, pw, ph, x, categorias, series }));
   return envolver(svg, W);
@@ -225,94 +294,13 @@ function camadaDeFoco({ L, T, pw, ph, x, categorias, series }) {
     });
     const entrar = (ev) => {
       fio.setAttribute('x1', x(i)); fio.setAttribute('x2', x(i)); fio.setAttribute('opacity', '.6');
-      mostrarDica(
-        [tituloDica(c), ...series.map(z => chaveDica(z.cor, z.nome, n(z.valores[i])))],
-        ev,
-      );
+      mostrarDica([tituloDica(c), ...series.map(z => chaveDica(z, n(z.valores[i])))], ev);
     };
     faixa.addEventListener('mousemove', entrar);
     faixa.addEventListener('mouseleave', () => { fio.setAttribute('opacity', '0'); esconderDica(); });
     g.append(faixa);
   });
   return g;
-}
-
-/* ==========================================================================
-   Colunas empilhadas — parte-todo por período
-   ========================================================================== */
-
-export function colunasEmpilhadas({ categorias, series, altura = 260, unidade = '' }) {
-  // T maior que nos outros gráficos: o total fica acima da coluna mais alta
-  // e precisa caber dentro do quadro.
-  const L = 46, R = 16, T = 24, B = 34;
-  const W = Math.max(560, categorias.length * 62 + L + R);
-  const H = altura;
-  const pw = W - L - R, ph = H - T - B;
-
-  const totais = categorias.map((_, i) => series.reduce((t, z) => t + (Number(z.valores[i]) || 0), 0));
-  const { topo, passo } = escala(Math.max(1, ...totais));
-
-  const banda = pw / categorias.length;
-  const largura = Math.min(24, banda * 0.55);
-  const y = (v) => T + ph - (v / topo) * ph;
-
-  const svg = s('svg', {
-    viewBox: `0 0 ${W} ${H}`, class: 'viz__svg', role: 'img',
-    'aria-label': `Colunas empilhadas: ${series.map(z => z.nome).join(', ')}`,
-  });
-
-  for (let v = 0; v <= topo + 1e-9; v += passo) {
-    svg.append(
-      s('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: 'var(--grade)', 'stroke-width': 1 }),
-      s('text', { x: L - 8, y: y(v) + 4, 'text-anchor': 'end', class: 'viz__tick' }, n(v)),
-    );
-  }
-
-  categorias.forEach((c, i) => {
-    const cx = L + banda * i + banda / 2;
-    let base = 0;
-
-    // De baixo para cima; só o topo recebe canto arredondado.
-    const segmentos = series
-      .map(z => ({ cor: z.cor, nome: z.nome, valor: Number(z.valores[i]) || 0 }))
-      .filter(seg => seg.valor > 0);
-
-    segmentos.forEach((seg, k) => {
-      const topoSeg = base + seg.valor;
-      const yTopo = y(topoSeg);
-      const alturaSeg = y(base) - yTopo;
-      const ultimo = k === segmentos.length - 1;
-      // 2px de respiro na cor da superfície entre segmentos que se tocam.
-      const h = Math.max(1, alturaSeg - (k ? 2 : 0));
-
-      svg.append(s('rect', {
-        x: cx - largura / 2, y: yTopo, width: largura, height: h,
-        rx: ultimo ? 4 : 0, fill: seg.cor,
-      }));
-      // Rebate o arredondamento na base do segmento do topo.
-      if (ultimo && h > 6) {
-        svg.append(s('rect', { x: cx - largura / 2, y: yTopo + 4, width: largura, height: h - 4, fill: seg.cor }));
-      }
-      base = topoSeg;
-    });
-
-    if (totais[i] > 0) {
-      svg.append(s('text', { x: cx, y: y(totais[i]) - 7, 'text-anchor': 'middle', class: 'viz__valor' }, n(totais[i])));
-    }
-    svg.append(s('text', { x: cx, y: H - 12, 'text-anchor': 'middle', class: 'viz__tick' }, c));
-
-    const alvo = s('rect', { x: L + banda * i, y: T, width: banda, height: ph, fill: 'transparent' });
-    alvo.addEventListener('mousemove', (ev) => mostrarDica([
-      tituloDica(c),
-      ...series.map(z => chaveDica(z.cor, z.nome, n(z.valores[i]))),
-      totalDica('Total', `${n(totais[i])}${unidade}`),
-    ], ev));
-    alvo.addEventListener('mouseleave', esconderDica);
-    svg.append(alvo);
-  });
-
-  svg.append(s('line', { x1: L, x2: W - R, y1: y(0), y2: y(0), stroke: 'var(--eixo)', 'stroke-width': 1 }));
-  return envolver(svg, W);
 }
 
 /* ==========================================================================
@@ -358,64 +346,11 @@ export function funil(etapas) {
 }
 
 /* ==========================================================================
-   Mapa de calor — magnitude numa grade
-   ========================================================================== */
-
-export function mapaCalor({ colunas, linhas: nomesLinha, valores, rotuloValor = 'valor' }) {
-  const larguraRotulo = 108, cel = 30, gap = 2;
-  const W = Math.max(560, larguraRotulo + colunas.length * cel + 16);
-  const H = nomesLinha.length * cel + 34;
-  const max = Math.max(1, ...valores.flat().map(v => Number(v) || 0));
-
-  const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, class: 'viz__svg', role: 'img', 'aria-label': `Mapa de calor de ${rotuloValor}` });
-
-  const salto = Math.ceil(colunas.length / Math.floor((W - larguraRotulo) / 46));
-  colunas.forEach((c, j) => {
-    if (j % salto) return;
-    svg.append(s('text', { x: larguraRotulo + j * cel + cel / 2, y: 14, 'text-anchor': 'middle', class: 'viz__tick' }, c));
-  });
-
-  nomesLinha.forEach((nome, i) => {
-    svg.append(s('text', { x: larguraRotulo - 10, y: 24 + i * cel + cel / 2 + 4, 'text-anchor': 'end', class: 'viz__rotulo' }, nome));
-
-    colunas.forEach((c, j) => {
-      const v = Number(valores[i]?.[j]) || 0;
-      const nivel = v === 0 ? 0 : Math.min(6, 1 + Math.floor((v / max) * 5.999));
-      const rect = s('rect', {
-        x: larguraRotulo + j * cel, y: 24 + i * cel,
-        width: cel - gap, height: cel - gap, rx: 3,
-        fill: `var(--seq-${nivel})`,
-      });
-      rect.addEventListener('mousemove', (ev) => mostrarDica([
-        tituloDica(`${nome} · ${c}`),
-        totalDica(rotuloValor, n(v)),
-      ], ev));
-      rect.addEventListener('mouseleave', esconderDica);
-      svg.append(rect);
-    });
-  });
-
-  return el('div', {},
-    envolver(svg, W),
-    escalaSequencial(max),
-  );
-}
-
-/** Legenda de escala: cor sozinha não pode carregar uma grandeza contínua. */
-function escalaSequencial(max) {
-  return el('div', { class: 'viz__escala' },
-    el('span', { class: 'small muted' }, '0'),
-    ...Array.from({ length: 7 }, (_, i) =>
-      el('span', { class: 'viz__degrau', style: `background:var(--seq-${i})` })),
-    el('span', { class: 'small muted' }, n(max)),
-  );
-}
-
-/* ==========================================================================
    Sparkline — 12 pontos dentro de um cartão de indicador
    ========================================================================== */
 
-export function sparkline(valores, cor = 'var(--area-0)') {
+/** @param {boolean} [tracejado] mesmo traço da linha do indicador no gráfico de todos */
+export function sparkline(valores, cor = 'var(--area-0)', tracejado = false) {
   const W = 96, H = 26, pad = 3;
   const vs = valores.map(v => Number(v) || 0);
   const max = Math.max(1, ...vs), min = Math.min(0, ...vs);
@@ -425,7 +360,8 @@ export function sparkline(valores, cor = 'var(--area-0)') {
   const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, class: 'viz__spark', 'aria-hidden': 'true', focusable: 'false' });
   svg.append(s('path', {
     d: vs.map((v, i) => `${i ? 'L' : 'M'}${x(i)} ${y(v)}`).join(' '),
-    fill: 'none', stroke: cor, 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+    fill: 'none', stroke: cor, 'stroke-width': 2, 'stroke-linejoin': 'round',
+    'stroke-linecap': tracejado ? 'butt' : 'round', 'stroke-dasharray': tracejado ? '4 3' : null,
   }));
   if (vs.length) {
     svg.append(s('circle', {
@@ -449,7 +385,7 @@ export function sparkline(valores, cor = 'var(--area-0)') {
  * @param {string} [o.cor]
  * @param {string} [o.nota]
  */
-export function cartaoIndicador({ rotulo, valor, variacao = null, serie = [], cor = 'var(--area-0)', nota }) {
+export function cartaoIndicador({ rotulo, valor, variacao = null, serie = [], cor = 'var(--area-0)', tracejado = false, nota }) {
   const seta = variacao == null ? '' : variacao > 0 ? '↑' : variacao < 0 ? '↓' : '→';
   const tom = variacao == null || variacao === 0 ? 'mute' : variacao > 0 ? 'ok' : 'err';
 
@@ -458,9 +394,12 @@ export function cartaoIndicador({ rotulo, valor, variacao = null, serie = [], co
     el('div', { class: 'kpi__valor' }, n(valor)),
     el('div', { class: 'kpi__pe' },
       variacao == null
-        ? el('span', { class: 'small muted' }, nota || 'sem base anterior')
+        // `??`, não `||`: quem passa nota '' quer o rodapé em branco (faixas de
+        // batismo, Caminho, Coordenação), não um "sem base anterior" que
+        // sugere uma comparação que nunca existiu.
+        ? el('span', { class: 'small muted' }, nota ?? 'sem base anterior')
         : el('span', { class: `badge badge--${tom}` }, `${seta} ${n1(Math.abs(variacao))}%`),
-      serie.length > 1 && sparkline(serie, cor),
+      serie.length > 1 && sparkline(serie, cor, tracejado),
     ),
   );
 }

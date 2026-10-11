@@ -134,6 +134,9 @@ create table if not exists public.voluntarios_almoco (
   criado_em     timestamptz not null default now()
 );
 
+-- `modalidade` (aqui e em voluntarios_almoco) ficou para trás: desde outubro de
+-- 2026 todo almoço é presencial e o app não grava nem mostra a coluna. Ela
+-- segue com o default 'presencial' para inserts antigos e o histórico.
 create table if not exists public.almoco_agenda (
   id          uuid primary key default gen_random_uuid(),
   data        date not null check (data >= date '2024-01-01'),
@@ -245,6 +248,9 @@ create table if not exists public.licoes_agenda (
 -- listas nominais. Frequência é da ala e mora em tabela própria.
 -- -----------------------------------------------------------------------------
 
+-- Casados e Homens adultos deixaram de ser lançados em outubro de 2026: o app
+-- lê e grava só as colunas `_total`. As `_casados` e `_homens` ficam aqui com
+-- o histórico, sem uso — derrubá-las apagaria dado já lançado por nada.
 create table if not exists public.relatorio_semanal (
   id       uuid primary key default gen_random_uuid(),
   data     date not null,
@@ -407,6 +413,10 @@ create table if not exists public.plano_ala (
   texto          text,
   atualizado_em  timestamptz not null default now()
 );
+
+-- Título editável de cada seção. Nulo é "use o título padrão do app"
+-- (SECOES_PLANO em js/config.js) — apagar o campo devolve o padrão.
+alter table public.plano_ala add column if not exists titulo text;
 
 -- =============================================================================
 -- RLS

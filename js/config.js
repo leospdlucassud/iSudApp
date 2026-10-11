@@ -85,8 +85,13 @@ export const corDaArea = (i) => `var(--area-${i % 8})`;
 /* ---------------------------------------------------------------------------
    Indicadores do relatório semanal
 
-   `split: true`  → o indicador se desdobra em Casados / Homens / Total,
-                    exatamente como nas colunas mescladas da planilha.
+   `coluna`       → coluna do Postgres quando ela difere da chave. As três
+                    contagens de pessoas eram desdobradas em Casados / Homens
+                    adultos / Total, como as colunas mescladas da planilha. O
+                    desdobramento deixou de ser lançado em outubro de 2026 e
+                    ficou só o total — que segue na coluna `_total` de sempre,
+                    então o histórico continua legível sem migração. As
+                    colunas `_casados` e `_homens` ficam no banco, paradas.
    `soma: true`   → entra na consolidação da ala (soma das áreas).
    `derivado`     → não é digitado; sai de outra parte do sistema.
    `pmg`          → número do indicador-chave correspondente em
@@ -99,17 +104,17 @@ export const corDaArea = (i) => `var(--area-${i % 8})`;
  * `licoesmembro` e não casaria com o que o cliente manda.
  */
 export const INDICADORES = [
-  { key: 'referencias',       label: 'Referências de Membro',         split: false, soma: true },
-  { key: 'licoes_membro',     label: 'Lições com Membros',            split: false, soma: true, pmg: 2 },
-  { key: 'outras_licoes',     label: 'Outras Lições',                 split: false, soma: true },
-  { key: 'novas_pessoas',     label: 'Novas Pessoas Sendo Ensinadas', split: true,  soma: true, pmg: 1, legado: 'Novos Pesquisadores' },
-  { key: 'novos_com_data',    label: 'Novos com Data de Batismo',     split: true,  soma: true },
-  { key: 'total_com_data',    label: 'Total com Data de Batismo',     split: true,  soma: true, pmg: 4, legado: 'Total Pesq C/ Data' },
-  { key: 'sacramental',       label: 'Assistiram à Sacramental',      split: false, soma: true, pmg: 3 },
-  { key: 'progredindo',       label: 'Progredindo',                   split: false, soma: true, derivado: 'lista nominal de progredindo' },
-  { key: 'batismos',          label: 'Batismos',                      split: true,  soma: true, pmg: 5, derivado: 'registro de batismos' },
-  { key: 'confirmacoes',      label: 'Confirmações',                  split: true,  soma: true, pmg: 5, derivado: 'registro de batismos' },
-  { key: 'novos_sacramental', label: 'Membros Novos na Sacramental',  split: false, soma: true, pmg: 6, derivado: 'caminho do convênio' },
+  { key: 'referencias',       label: 'Referências de Membro',         soma: true },
+  { key: 'licoes_membro',     label: 'Lições com Membros',            soma: true, pmg: 2 },
+  { key: 'outras_licoes',     label: 'Outras Lições',                 soma: true },
+  { key: 'novas_pessoas',     label: 'Novas Pessoas Sendo Ensinadas', soma: true, pmg: 1, coluna: 'novas_pessoas_total', legado: 'Novos Pesquisadores' },
+  { key: 'novos_com_data',    label: 'Novos com Data de Batismo',     soma: true,         coluna: 'novos_com_data_total' },
+  { key: 'total_com_data',    label: 'Total com Data de Batismo',     soma: true, pmg: 4, coluna: 'total_com_data_total', legado: 'Total Pesq C/ Data' },
+  { key: 'sacramental',       label: 'Assistiram à Sacramental',      soma: true, pmg: 3 },
+  { key: 'progredindo',       label: 'Progredindo',                   soma: true, derivado: 'lista nominal de progredindo' },
+  { key: 'batismos',          label: 'Batismos',                      soma: true, pmg: 5, derivado: 'registro de batismos' },
+  { key: 'confirmacoes',      label: 'Confirmações',                  soma: true, pmg: 5, derivado: 'registro de batismos' },
+  { key: 'novos_sacramental', label: 'Membros Novos na Sacramental',  soma: true, pmg: 6, derivado: 'caminho do convênio' },
 ];
 
 /**
@@ -124,17 +129,6 @@ export const FREQUENCIA = {
   soma: false,
 };
 
-/**
- * Desdobramento das colunas mescladas da planilha.
- *
- * Atenção ao "Homens": na planilha significa homem ADULTO (18 anos ou mais),
- * não sexo masculino. Um menino de 8 anos conta em Total e zero em Homens.
- */
-export const SUBCAMPOS = [
-  { key: 'casados', label: 'Casados' },
-  { key: 'homens',  label: 'Homens adultos' },
-  { key: 'total',   label: 'Total' },
-];
 
 export const indicadorPorKey = Object.fromEntries(INDICADORES.map(i => [i.key, i]));
 
@@ -296,13 +290,6 @@ export const HORARIOS = [
 export const MODALIDADES_LICAO = [
   { key: 'presencial', label: 'Presencial',     icone: '🏠' },
   { key: 'video',      label: 'Vídeo chamada',  icone: '📱' },
-];
-
-/** Como o voluntário entrega o almoço — extraído da coluna OBS. da planilha. */
-export const MODALIDADES_ALMOCO = [
-  { key: 'presencial', label: 'Presencial',  icone: '🍽️' },
-  { key: 'quentinha',  label: 'Quentinha',   icone: '🥡' },
-  { key: 'pix',        label: 'Pix',         icone: '💸' },
 ];
 
 /** Periodicidades recorrentes que apareciam escritas à mão nos OBS. */

@@ -546,6 +546,21 @@ a { color: var(--primary); }
 }
 .input--num  { font-family: var(--font-num); text-align: center; }
 .input--erro { border-color: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
+
+/* Campo que parece título de cartão até ser editado — o título das seções do
+   plano da ala. A moldura só aparece no hover e no foco, para a pessoa saber
+   que dá para escrever ali. */
+.input--titulo {
+  border-color: transparent;
+  background: transparent;
+  padding: .25rem .5rem;
+  margin-left: -.5rem;
+  font-size: .9375rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.input--titulo:hover { border-color: var(--border); }
+.input--titulo:focus { background: var(--surface); }
 .textarea { resize: vertical; min-height: 4.5rem; }
 
 .chips { display: flex; flex-wrap: wrap; gap: .375rem; }
@@ -627,6 +642,16 @@ a { color: var(--primary); }
   border-color: var(--primary);
   color: #fff;
   font-weight: 700;
+}
+/* Marco que não se aplica: mesmo quadrado, sem borda nem fundo, traço no meio.
+   `position: relative` segura o texto para leitor de tela (.sr-only, absoluto)
+   dentro do quadrado. Sem isso ele se ancorava na página, escapava da rolagem
+   da tabela e alargava o documento inteiro — no celular, a tela abria com zoom
+   reduzido e rolagem lateral. */
+.slot--na,
+.slot--na:hover {
+  position: relative;
+  border-color: transparent; background: transparent; color: var(--text-3); font-size: 1rem;
 }
 
 .densidade { border: 1px solid transparent; font-weight: 600; }
@@ -822,7 +847,29 @@ code {
   padding: .625rem 1rem 0;
 }
 .viz__item { display: inline-flex; align-items: center; gap: .375rem; font-size: .8125rem; color: var(--text-2); }
-.viz__chave { width: .75rem; height: .1875rem; border-radius: 2px; flex: 0 0 auto; }
+.viz__chave { width: .75rem; height: .1875rem; border-radius: 2px; flex: 0 0 auto; background: var(--cor); }
+/* A chave imita o traço da linha: tracejada quando a série é tracejada. */
+.viz__chave--tracejada {
+  width: 1.125rem; border-radius: 0;
+  background: repeating-linear-gradient(90deg, var(--cor) 0 .375rem, transparent .375rem .625rem);
+}
+
+/* Legenda clicável: destaca uma série e apaga as outras. */
+.viz__item--botao {
+  /* Alvo maior que o texto, sem empurrar o vizinho: a margem negativa
+     devolve o espaço do padding e sobra o vão da legenda entre os itens. */
+  padding: .1875rem .375rem; margin: -.1875rem -.375rem;
+  border: 1px solid transparent; border-radius: var(--r-pill);
+  background: transparent; cursor: pointer;
+}
+.viz__item--botao:hover { color: var(--text); }
+.viz__item--botao[aria-pressed="true"] {
+  color: var(--text); font-weight: 600;
+  border-color: var(--border-strong); background: var(--surface-2);
+}
+.viz__serie { transition: opacity .15s; }
+.viz__serie--apagada { opacity: .12; }
+@media (prefers-reduced-motion: reduce) { .viz__serie { transition: none; } }
 
 .viz__spark { width: 6rem; height: 1.625rem; flex: 0 0 auto; }
 
@@ -846,12 +893,11 @@ code {
 .viz-dica__titulo { display: block; margin-bottom: .25rem; font-size: .75rem; }
 .viz-dica__linha  { display: flex; align-items: center; gap: .375rem; }
 .viz-dica__linha b { margin-left: auto; font-variant-numeric: tabular-nums; }
-.viz-dica__chave  { width: .5rem; height: .5rem; border-radius: 2px; flex: 0 0 auto; }
-.viz-dica__total  {
-  display: flex; gap: .5rem; margin-top: .25rem; padding-top: .25rem;
-  border-top: 1px solid rgba(255,255,255,.18);
+.viz-dica__chave  { width: .75rem; height: .1875rem; border-radius: 2px; flex: 0 0 auto; background: var(--cor); }
+.viz-dica__chave--tracejada {
+  width: 1rem; border-radius: 0;
+  background: repeating-linear-gradient(90deg, var(--cor) 0 .3125rem, transparent .3125rem .5rem);
 }
-.viz-dica__total b { margin-left: auto; font-variant-numeric: tabular-nums; }
 
 /* Cartão de indicador */
 .kpi {

@@ -129,7 +129,7 @@ function seletorModalidade() {
 
 function painelMinha() {
   const nome = el('input', { class: 'input', autocomplete: 'name', placeholder: 'como a ala te conhece' });
-  const telefone = el('input', { class: 'input', type: 'tel', autocomplete: 'tel', placeholder: '21 90000-0000' });
+  const telefone = el('input', { class: 'input', type: 'tel', autocomplete: 'tel', placeholder: '63 90000-0000' });
 
   // Estado local da grade: Set de "modalidade|dia|horario".
   const marcados = new Set();

@@ -17,7 +17,7 @@
  */
 
 import { DOMINIO_USUARIO } from './config.js';
-import { uuid } from './util.js';
+import { hoje, uuid } from './util.js';
 
 /** Violação de unicidade — o registro já existe. */
 export class ConflitoError extends Error {
@@ -41,6 +41,7 @@ const UNICOS = {
   frequencia_ala:      ['data'],
   caminho_marcos:      ['pessoa_id', 'marco'],
   caminho_frequencia:  ['pessoa_id', 'domingo'],
+  plano_ala:           ['secao'],
 };
 
 let backend = null;
@@ -233,6 +234,12 @@ async function backendSupabase(url, anonKey) {
     if (!error) return data;
     if (error.code === '23505') throw new ConflitoError();       // unique_violation
     if (error.code === '42501') throw new Error('Você não tem permissão para esta ação.');
+    // Coluna que o app conhece e o banco ainda não: é o schema.sql que não foi
+    // rodado de novo depois de uma atualização. A mensagem crua do PostgREST
+    // ("Could not find the 'titulo' column…") não diz a ninguém o que fazer.
+    if (error.code === 'PGRST204') {
+      throw new Error('O banco precisa ser atualizado: rode o supabase/schema.sql de novo no SQL Editor.');
+    }
     throw new Error(error.message);
   };
 
@@ -411,14 +418,25 @@ let falhaAoConectar = null;
    a aba. Fechar a aba encerra a demonstração, e quem abrir o endereço normal
    depois cai no app de verdade.
 
-   Toda entrada nova começa com dados recém-gerados, porque as datas saem do
-   dia de hoje: uma carga de semanas atrás abriria os calendários vazios.
-   Recarregar a página dentro da demonstração preserva o que o apresentador
-   mexeu.
+   Os dados valem pelo dia em que foram gerados, porque as datas saem de hoje:
+   uma carga de semanas atrás abriria os calendários vazios. Dentro do mesmo
+   dia eles são preservados — recarregar a página, abrir a demonstração numa
+   segunda aba ou sair dela em uma das abas não desfaz o que já foi mexido.
+   Só "Recomeçar dados" regenera, e a virada do dia.
+
+   Quando uma aba regenera, as outras se recarregam sozinhas (ver
+   vigiarOutrasAbas). Uma aba que continuasse mostrando a carga anterior
+   agiria sobre registros que não existem mais.
 --------------------------------------------------------------------------- */
 
 const PREFIXO_DEMO = 'om_demo_';
 const MARCA_SEMEADO = PREFIXO_DEMO + '_semeado';
+/**
+ * Sobe quando js/demo.js muda de forma: a marca guardada deixa de bater e o
+ * navegador regenera em vez de mostrar dados no formato antigo.
+ */
+const VERSAO_DEMO = 3;
+const marcaDeHoje = () => `${VERSAO_DEMO}|${hoje()}`;
 let demo = false;
 
 function apagarDadosDaDemonstracao() {
@@ -427,10 +445,51 @@ function apagarDadosDaDemonstracao() {
   }
 }
 
+/**
+ * Grava cada coleção INTEIRA, com ids fixos — nunca acrescenta.
+ *
+ * Escreve direto no localStorage, no mesmo formato que o backendLocal lê
+ * (prefixo + nome da coleção), porque o backend só sabe acrescentar. E
+ * acrescentar era o defeito: duas abas semeando ao mesmo tempo somavam duas
+ * cargas, e com as áreas em dobro todo total da ala saía em dobro. Como
+ * gerar() é determinística, duas escritas simultâneas gravam o mesmo
+ * conteúdo, e a que chegar por último não muda nada.
+ *
+ * O dia entra no id. O conteúdo de cada posição muda de um dia para o outro
+ * (as datas saem de hoje), e com o id só pela posição uma aba esquecida aberta
+ * desde ontem apagava, num "Liberar a vaga", a reserva de outro dia que
+ * herdara aquele id — com aviso de sucesso. Com o dia no id, o registro velho
+ * simplesmente não é encontrado.
+ */
 async function semearDemonstracao() {
-  const { semear } = await import('./demo.js');
-  await semear(backend);
-  localStorage.setItem(MARCA_SEMEADO, new Date().toISOString());
+  // Tudo que pode falhar vem ANTES de apagar: o import de demo.js vai à rede
+  // (ou ao cache do service worker) e pode não voltar. Apagando primeiro, uma
+  // falha aqui deixava a demonstração vazia em vez de intacta.
+  const { gerar } = await import('./demo.js');
+  const agora = new Date().toISOString();
+  const dia = hoje();
+  const carga = Object.entries(gerar()).map(([colecao, linhas]) =>
+    [colecao, linhas.map((l, i) => ({ id: `demo-${dia}-${colecao}-${i}`, criado_em: agora, ...l }))]);
+
+  // Daqui para baixo é síncrono: apaga e reescreve sem ninguém no meio.
+  apagarDadosDaDemonstracao();
+  for (const [colecao, linhas] of carga) {
+    localStorage.setItem(PREFIXO_DEMO + colecao, JSON.stringify(linhas));
+  }
+  localStorage.setItem(MARCA_SEMEADO, marcaDeHoje());
+}
+
+/**
+ * Recarrega esta aba quando outra regenera a demonstração.
+ *
+ * O evento `storage` só chega às OUTRAS abas, nunca à que escreveu. Reage à
+ * marca recém-gravada, e não à remoção que vem antes dela: recarregar no meio
+ * da escrita da outra aba só faria esta semear também.
+ */
+function vigiarOutrasAbas() {
+  addEventListener('storage', (e) => {
+    if (e.key === MARCA_SEMEADO && e.newValue) location.reload();
+  });
 }
 
 /** Liga a demonstração se a URL pedir. Devolve se ela está ativa nesta aba. */
@@ -438,7 +497,6 @@ function ligarDemonstracaoSePedida() {
   const pedida = new URLSearchParams(location.search).has('demo');
   if (pedida && sessionStorage.getItem('om_demo') !== '1') {
     sessionStorage.setItem('om_demo', '1');
-    apagarDadosDaDemonstracao();
     // A apresentação começa pelas telas do LMA, que são as que têm o que
     // mostrar. O botão de papel no cabeçalho alterna para a visão de membro.
     entrarEmPrevia();
@@ -460,13 +518,17 @@ export const estadoDaConexao = () => (demo ? 'demo' : ehSupabase ? 'live' : 'off
 /** Descarta o que foi mexido durante a apresentação e gera tudo de novo. */
 export async function recomecarDemonstracao() {
   if (!demo) return;
-  apagarDadosDaDemonstracao();
   await semearDemonstracao();
 }
 
-/** Sai da demonstração sem deixar rastro neste navegador. */
+/**
+ * Sai da demonstração NESTA aba.
+ *
+ * Não apaga os dados: o modo vale por aba, mas os dados são de todas, e
+ * apagar aqui deixava vazia outra aba que continuasse apresentando. Eles são
+ * fictícios, só são lidos dentro da demonstração e expiram com o dia.
+ */
 export function sairDaDemonstracao() {
-  apagarDadosDaDemonstracao();
   sessionStorage.removeItem('om_demo');
   sessionStorage.removeItem('om_previa');
   previa = false;
@@ -478,7 +540,17 @@ export async function iniciar() {
   if (demo) {
     backend = backendLocal(PREFIXO_DEMO, 'om_demo_sync');
     await backend.iniciar();
-    if (!localStorage.getItem(MARCA_SEMEADO)) await semearDemonstracao();
+    // Mesma proteção do ramo normal, logo abaixo: se a semeadura lança — o
+    // import de demo.js falhando num celular sem sinal, por exemplo —, o app
+    // não pode ficar girando em "Carregando…" para sempre. Cai na tela de sem
+    // conexão, que tem o botão de tentar de novo.
+    try {
+      if (localStorage.getItem(MARCA_SEMEADO) !== marcaDeHoje()) await semearDemonstracao();
+    } catch (err) {
+      falhaAoConectar = `Não foi possível montar a demonstração: ${err?.message || err}`;
+      console.error('[db] falha ao semear a demonstração:', err);
+    }
+    vigiarOutrasAbas();
     return backend.nome;
   }
 

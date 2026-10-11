@@ -6,7 +6,7 @@
  * pior do que erro de conexão.
  */
 
-const CACHE = 'om-v7';
+const CACHE = 'om-v8';
 
 const CASCA = [
   '/',
@@ -21,6 +21,9 @@ const CASCA = [
   '/js/util.js',
   '/js/vendor/supabase.js',
   '/js/modules/inicio.js',
+  // Para ?demo abrir mesmo num celular sem sinal: sem ele em cache, a
+  // semeadura falha e a demonstração cai na tela de sem conexão.
+  '/js/demo.js',
   '/icons/icon.svg',
   '/icons/icon-192.png',
   '/icons/icon-512.png',

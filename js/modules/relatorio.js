@@ -16,11 +16,10 @@
 
 import {
   ALA, AREAS_PADRAO, FAIXAS, FUNIL, INDICADORES, INDICADORES_CHAVE,
-  FREQUENCIA, MESES, ORGANIZACOES, SUBCAMPOS, corDaArea, faixaEtaria,
+  FREQUENCIA, MESES, ORGANIZACOES, corDaArea, faixaEtaria,
 } from '../config.js';
 import {
-  cartaoIndicador, colunasEmpilhadas, funil, linhas, mapaCalor,
-  moldura, n, tabelaSimples,
+  cartaoIndicador, funil, linhas, moldura, n, tabelaSimples,
 } from '../charts.js';
 import {
   comparaNome, dataCurta, deISO, domingoDaSemana, domingosDoAno, domingosDoMes,
@@ -38,6 +37,49 @@ const COL_CAM_FREQ    = 'caminho_frequencia';
 
 /** Indicadores que o LMA digita. O resto é derivado. */
 const MANUAIS = INDICADORES.filter(i => !i.derivado);
+
+/** Valor do seletor de indicador que pede todos no mesmo gráfico. */
+const TODOS = 'todos';
+
+/**
+ * Cor e traço de cada indicador quando ele vira linha ou cartão.
+ *
+ * Onze indicadores num gráfico só não cabem na cor: o validador da skill
+ * dataviz, rodado com todos os pares (num gráfico de linhas qualquer par pode
+ * se encostar), aprova no máximo QUATRO das oito cores da paleta nos dois
+ * temas ao mesmo tempo. Não existe atribuição que torne onze linhas legíveis
+ * só pela cor.
+ *
+ * Então a cor marca a FAMÍLIA e o traço marca o membro: seis famílias, linha
+ * cheia para o principal e tracejada para o parente. São seis cores em vez de
+ * oito, sem o laranja — laranja × vermelho ficava a ΔE 7 até para quem
+ * enxerga todas as cores, e laranja × verde a 3 sob protanopia.
+ *
+ * Das seis, o par que ainda colapsa para daltônicos no tema escuro é azul ×
+ * violeta (ΔE 1,9). Ele fica com Batismos (rente ao zero) e Lições (a linha
+ * mais alta), as famílias mais distantes em valor — essas linhas não se
+ * encostam. O resto da leitura é o destaque pela legenda, a dica e a tabela.
+ *
+ * Os cartões do topo usam a mesma cor e o mesmo traço do indicador.
+ */
+const ESTILO_INDICADOR = {
+  novas_pessoas:     { slot: 5 },                    // verde
+  progredindo:       { slot: 5, tracejado: true },
+  licoes_membro:     { slot: 6 },                    // violeta
+  outras_licoes:     { slot: 6, tracejado: true },
+  sacramental:       { slot: 2 },                    // água
+  novos_sacramental: { slot: 2, tracejado: true },
+  total_com_data:    { slot: 3 },                    // amarelo
+  novos_com_data:    { slot: 3, tracejado: true },
+  batismos:          { slot: 0 },                    // azul
+  confirmacoes:      { slot: 0, tracejado: true },
+  referencias:       { slot: 7 },                    // vermelho
+};
+
+const estiloDo = (key) => {
+  const e = ESTILO_INDICADOR[key] ?? { slot: 0 };
+  return { cor: corDaArea(e.slot), tracejado: !!e.tracejado };
+};
 
 let ctx, raiz;
 let aba = 'lancamento';
@@ -80,24 +122,20 @@ async function recarregar() {
    Leitura e agregação
 --------------------------------------------------------------------------- */
 
-const chaveCampo = (ind, sub) => (ind.split ? `${ind.key}_${sub}` : ind.key);
+/** Coluna do Postgres de um indicador digitado. Ver `coluna` em INDICADORES. */
+const chaveCampo = (ind) => ind.coluna ?? ind.key;
 
 const linhaDe = (data, areaId) => semanais.find(r => r.data === data && r.area_id === areaId);
 
 /** Valor de um indicador numa área e semana. Derivados saem das listas nominais. */
-function valor(data, areaId, indKey, sub = 'total') {
+function valor(data, areaId, indKey) {
   if (indKey === 'progredindo') {
     return progredindo.filter(p => p.data === data && p.area_id === areaId).length;
   }
   if (indKey === 'batismos' || indKey === 'confirmacoes') {
     const campo = indKey === 'batismos' ? 'data_batismo' : 'data_confirmacao';
-    const alcanca = batismos.filter(b =>
-      b.area_id === areaId && b[campo] && domingoDaSemana(b[campo]) === data);
-    if (sub === 'total')   return alcanca.length;
-    // "Homens" na planilha é homem ADULTO, não sexo masculino: um menino de 8
-    // anos é masculino e conta zero nessa coluna.
-    if (sub === 'homens')  return alcanca.filter(b => faixaEtaria(b.idade, b.sexo) === 'homens').length;
-    if (sub === 'casados') return alcanca.filter(b => b.familia_completa).length;
+    return batismos.filter(b =>
+      b.area_id === areaId && b[campo] && domingoDaSemana(b[campo]) === data).length;
   }
   if (indKey === 'novos_sacramental') {
     return novosNaSacramental(data, areaId, caminhoPessoas, caminhoFrequencia);
@@ -105,12 +143,12 @@ function valor(data, areaId, indKey, sub = 'total') {
 
   const r = linhaDe(data, areaId);
   const ind = INDICADORES.find(i => i.key === indKey);
-  return num(r?.[chaveCampo(ind, sub)]);
+  return num(r?.[chaveCampo(ind)]);
 }
 
 /** Consolidado da ala: soma das áreas ativas. Frequência jamais entra aqui. */
-function valorAla(data, indKey, sub = 'total') {
-  return soma(areas, a => valor(data, a.id, indKey, sub));
+function valorAla(data, indKey) {
+  return soma(areas, a => valor(data, a.id, indKey));
 }
 
 const frequenciaDe = (data) => {
@@ -204,23 +242,18 @@ function painelLancamento() {
     onchange: (e) => { areaSel = e.target.value; pintar(); } },
     ...areas.map(a => el('option', { value: a.id, selected: a.id === area.id }, a.nome)));
 
-  // Cabeçalho de duas faixas: indicador em cima, o desdobramento embaixo.
+  // Uma coluna por indicador, com o nome inteiro — nunca abreviação. "Liç.M"
+  // e "N.Data" só faziam sentido para quem já conhecia a planilha antiga, e o
+  // `title` que os explicava não existe em celular. A classe .table--rotulos
+  // deixa o cabeçalho quebrar linha para o nome caber.
   //
-  // Nome inteiro, nunca abreviação. "Liç.M", "N.Data" e o "H" de homens ADULTOS
-  // só faziam sentido para quem já conhecia a planilha antiga, e o `title` que
-  // os explicava não existe em celular. A classe .table--rotulos deixa o
-  // cabeçalho quebrar linha para o nome caber.
-  const topo = el('tr', {}, el('th', { rowspan: 2 }, 'Domingo'));
-  const base = el('tr', {});
-  for (const ind of MANUAIS) {
-    if (ind.split) {
-      topo.append(el('th', { colspan: 3, class: 'center' }, ind.label));
-      for (const sc of SUBCAMPOS) base.append(el('th', { class: 'center' }, sc.label));
-    } else {
-      topo.append(el('th', { rowspan: 2, class: 'center' }, ind.label));
-    }
-  }
-  topo.append(el('th', { rowspan: 2, class: 'center' }, FREQUENCIA.label));
+  // Já foram duas faixas, com Casados / Homens adultos / Total embaixo das
+  // contagens de pessoas. Desde outubro de 2026 só o total é lançado.
+  const topo = el('tr', {},
+    el('th', {}, 'Domingo'),
+    ...MANUAIS.map(ind => el('th', { class: 'center' }, ind.label)),
+    el('th', { class: 'center' }, FREQUENCIA.label),
+  );
 
   const corpo = el('tbody', {}, ...domingos.map(d => linhaLancamento(d, area)));
 
@@ -234,7 +267,7 @@ function painelLancamento() {
         el('span', { class: 'small muted' }, 'salva ao sair do campo'),
       ),
       el('div', { class: 'table-wrap' },
-        el('table', { class: 'table table--rotulos' }, el('thead', {}, topo, base), corpo)),
+        el('table', { class: 'table table--rotulos' }, el('thead', {}, topo), corpo)),
     ),
     el('div', { class: 'card' },
       el('div', { class: 'card__head' }, el('span', { class: 'card__title' }, 'Derivados — não se digita aqui')),
@@ -265,14 +298,11 @@ function linhaLancamento(data, area) {
   const tr = el('tr', {}, el('td', { class: 'nowrap' }, dataCurta(data)));
 
   for (const ind of MANUAIS) {
-    const subs = ind.split ? SUBCAMPOS.map(s => s.key) : [null];
-    for (const sub of subs) {
-      tr.append(el('td', {}, campoNumero({
-        valor: valor(data, area.id, ind.key, sub ?? 'total'),
-        rotulo: `${ind.label}${sub ? ` — ${sub}` : ''} em ${dataCurta(data)}`,
-        aoSalvar: (v) => salvarSemanal(data, area.id, chaveCampo(ind, sub), v),
-      })));
-    }
+    tr.append(el('td', {}, campoNumero({
+      valor: valor(data, area.id, ind.key),
+      rotulo: `${ind.label} em ${dataCurta(data)}`,
+      aoSalvar: (v) => salvarSemanal(data, area.id, chaveCampo(ind), v),
+    })));
   }
 
   tr.append(el('td', {}, campoNumero({
@@ -323,37 +353,21 @@ async function salvarFrequencia(data, v) {
 function painelConsolidado() {
   const domingos = domingosDoMes(ano, mes);
 
-  const topo = el('tr', {}, el('th', { rowspan: 2 }, 'Domingo'));
-  const base = el('tr', {});
-  for (const ind of INDICADORES) {
-    if (ind.split) {
-      topo.append(el('th', { colspan: 3, class: 'center' }, ind.label));
-      for (const sc of SUBCAMPOS) base.append(el('th', { class: 'center' }, sc.label));
-    } else {
-      topo.append(el('th', { rowspan: 2, class: 'center' }, ind.label));
-    }
-  }
-  topo.append(el('th', { rowspan: 2, class: 'center' }, FREQUENCIA.label));
+  const topo = el('tr', {},
+    el('th', {}, 'Domingo'),
+    ...INDICADORES.map(ind => el('th', { class: 'center' }, ind.label)),
+    el('th', { class: 'center' }, FREQUENCIA.label),
+  );
 
   const celulas = (d) => {
-    const tds = [];
-    for (const ind of INDICADORES) {
-      for (const sub of (ind.split ? SUBCAMPOS.map(s => s.key) : ['total'])) {
-        const v = valorAla(d, ind.key, sub);
-        tds.push(el('td', { class: v == null ? 'num muted' : 'num' }, v == null ? '—' : n(v)));
-      }
-    }
+    const tds = INDICADORES.map(ind => el('td', { class: 'num' }, n(valorAla(d, ind.key))));
     const f = frequenciaDe(d);
     tds.push(el('td', { class: f == null ? 'num muted' : 'num' }, f == null ? '—' : n(f)));
     return tds;
   };
 
-  const rodape = el('tr', {}, el('td', {}, 'Total do mês'));
-  for (const ind of INDICADORES) {
-    for (const sub of (ind.split ? SUBCAMPOS.map(s => s.key) : ['total'])) {
-      rodape.append(el('td', { class: 'num' }, n(soma(domingos, d => valorAla(d, ind.key, sub)))));
-    }
-  }
+  const rodape = el('tr', {}, el('td', {}, 'Total do mês'),
+    ...INDICADORES.map(ind => el('td', { class: 'num' }, n(soma(domingos, d => valorAla(d, ind.key))))));
   // Frequência não soma: a média do mês é a leitura que faz sentido.
   const freqs = domingos.map(frequenciaDe).filter(v => v != null);
   rodape.append(el('td', { class: 'num', title: 'média dos domingos com lançamento' },
@@ -369,7 +383,7 @@ function painelConsolidado() {
       ),
       el('div', { class: 'table-wrap' },
         el('table', { class: 'table table--rotulos' },
-          el('thead', {}, topo, base),
+          el('thead', {}, topo),
           el('tbody', {}, ...domingos.map(d => el('tr', {}, el('td', { class: 'nowrap' }, dataCurta(d)), ...celulas(d)))),
           el('tfoot', {}, rodape),
         )),
@@ -392,26 +406,15 @@ function painelConsolidado() {
 
 function exportarCSV() {
   const domingos = domingosDoMes(ano, mes);
-  const cab = ['Domingo', 'Área'];
-  for (const ind of INDICADORES) {
-    if (ind.split) for (const sc of SUBCAMPOS) cab.push(`${ind.label} - ${sc.label}`);
-    else cab.push(ind.label);
-  }
-  cab.push(FREQUENCIA.label);
+  const cab = ['Domingo', 'Área', ...INDICADORES.map(ind => ind.label), FREQUENCIA.label];
 
   const linhasCSV = [];
   for (const d of domingos) {
     // Linha do consolidado. O nome vem de ALA — ficou para trás na troca de
     // identidade porque só aparece no CSV, nunca na tela.
     for (const a of [...areas, { id: null, nome: ALA.nome.toUpperCase() }]) {
-      const ler = (k, s) => (a.id ? valor(d, a.id, k, s) : valorAla(d, k, s));
-      const linha = [dataCurta(d), a.nome];
-      for (const ind of INDICADORES) {
-        for (const sub of (ind.split ? SUBCAMPOS.map(s => s.key) : ['total'])) {
-          const v = ler(ind.key, sub);
-          linha.push(v == null ? '' : v);
-        }
-      }
+      const ler = (k) => (a.id ? valor(d, a.id, k) : valorAla(d, k));
+      const linha = [dataCurta(d), a.nome, ...INDICADORES.map(ind => ler(ind.key) ?? '')];
       linha.push(a.id ? '' : (frequenciaDe(d) ?? ''));
       linhasCSV.push(linha);
     }
@@ -437,7 +440,8 @@ function painelGraficos() {
   const mesAnterior = new Date(ano, mes - 1, 1);
   const doMesAnterior = domingosDoMes(mesAnterior.getFullYear(), mesAnterior.getMonth());
 
-  const ind = INDICADORES.find(i => i.key === indicadorGrafico) ?? INDICADORES[0];
+  const todos = indicadorGrafico === TODOS;
+  const ind = todos ? null : INDICADORES.find(i => i.key === indicadorGrafico) ?? INDICADORES[0];
 
   // Uma só faixa de filtros acima de tudo que ela controla.
   const filtros = el('div', { class: 'row row--wrap', style: 'margin-bottom:1rem' },
@@ -449,16 +453,16 @@ function painelGraficos() {
       ...MESES.map((m, i) => el('option', { value: i, selected: i === mes }, m))),
     el('span', { class: 'small muted', style: 'margin-left:.75rem' }, 'Indicador:'),
     el('select', { class: 'select', style: 'max-width:16rem', onchange: (e) => { indicadorGrafico = e.target.value; pintar(); } },
+      el('option', { value: TODOS, selected: todos }, 'Todos os indicadores'),
       ...INDICADORES.map(i => el('option', { value: i.key, selected: i.key === indicadorGrafico }, i.label))),
   );
 
   return el('div', {},
     filtros,
     cartoesChave(doMes, doMesAnterior, domingosAno),
-    graficoPorArea(ind, domingosAno),
+    todos ? graficoTodos(domingosAno) : graficoPorArea(ind, domingosAno),
     graficoFunil(doMes),
     graficoBatismos(),
-    graficoCalor(ind),
   );
 }
 
@@ -482,7 +486,7 @@ function cartoesChave(doMes, doMesAnterior, domingosAno) {
   const media = (domingos, key) => totalNoPeriodo(domingos, key) / domingos.length;
 
   return el('div', { class: 'grid grid--kpi', style: 'margin-bottom:1rem' },
-    ...INDICADORES_CHAVE.map((ind, i) => cartaoIndicador({
+    ...INDICADORES_CHAVE.map((ind) => cartaoIndicador({
       rotulo: `${ind.pmg}. ${ind.label}`,
       valor: totalNoPeriodo(passados, ind.key),
       variacao: passados.length && anteriores.length
@@ -490,7 +494,7 @@ function cartoesChave(doMes, doMesAnterior, domingosAno) {
         : null,
       nota: passados.length ? 'sem base anterior' : 'nenhum domingo ainda',
       serie: ultimos12.map(d => valorAla(d, ind.key)),
-      cor: corDaArea(i),
+      ...estiloDo(ind.key),
     })),
   );
 }
@@ -520,6 +524,45 @@ function graficoPorArea(ind, domingosAno) {
   });
 }
 
+/**
+ * Todos os indicadores num gráfico só, total da ala.
+ *
+ * Foi pedido assim, sabendo do custo: as escalas são diferentes — Outras
+ * Lições anda na casa das dezenas, Batismos entre zero e dois —, então as
+ * linhas pequenas ficam rente ao chão. O que segura a leitura:
+ *
+ *  - a legenda destaca uma linha e apaga as outras, sem esconder nenhuma;
+ *  - a dica no fio vertical lista os onze valores daquele domingo;
+ *  - a tabela traz tudo em número;
+ *  - a cor marca a família e o tracejado o parente (ver ESTILO_INDICADOR).
+ *
+ * Sem rótulo no fim das linhas: onze nomes empilhados na borda direita viram
+ * ruído. A legenda faz esse papel.
+ */
+function graficoTodos(domingosAno) {
+  if (!domingosAno.length) {
+    return moldura({ titulo: 'Todos os indicadores', figura: vazio('Sem domingos', `Nada lançado em ${ano}.`, '📈') });
+  }
+
+  const series = INDICADORES.map(ind => ({
+    nome: ind.label,
+    ...estiloDo(ind.key),
+    valores: domingosAno.map(d => valorAla(d, ind.key)),
+  }));
+
+  return moldura({
+    titulo: 'Todos os indicadores — total da ala',
+    descricao: `Domingos de ${ano} até hoje. Toque num indicador da legenda para destacar a linha dele.`,
+    figura: linhas({ categorias: domingosAno.map(dataCurta), series, altura: 340 }),
+    series,
+    tabela: () => tabelaSimples(
+      ['Domingo', ...INDICADORES.map(i => i.label)],
+      domingosAno.map(d => [dataCurta(d), ...INDICADORES.map(i => n(valorAla(d, i.key)))]),
+      { rotulosLongos: true },
+    ),
+  });
+}
+
 function graficoFunil(doMes) {
   const etapas = FUNIL.map(f => ({
     rotulo: f.label,
@@ -536,50 +579,74 @@ function graficoFunil(doMes) {
   });
 }
 
+/**
+ * Batismos por mês, uma linha por área.
+ *
+ * Era coluna empilhada por faixa etária. Com contagens de zero a dois por mês,
+ * as pilhas viravam blocos soltos difíceis de comparar, e a cor da faixa
+ * competia com a cor da área usada em todo o resto do relatório. A faixa
+ * continua na aba Batismos e na tabela deste gráfico.
+ *
+ * Mês ainda não começado não entra: plotado como zero, ele diria que não
+ * houve batismo num mês que nem aconteceu. A exceção é batismo já cadastrado
+ * com data futura — o eixo vai até o mês dele. Cortar ali fazia o gráfico
+ * mostrar linhas zeradas (ou "nenhum batismo") enquanto a aba Batismos, que
+ * conta o registro inteiro, mostrava o batismo.
+ *
+ * O mês é o do relatório, não o do calendário: o batismo conta no mês do
+ * domingo que fecha a semana, como em valor() — e portanto no funil, no
+ * cartão 5 e no consolidado. Pelo calendário, o batismo de sábado 31/10 caía
+ * em outubro aqui e em novembro no funil logo acima, no mesmo painel. A única
+ * divergência que sobra é com a aba Batismos, que é um registro e separa o
+ * ano pela data do batismo: um sábado de fim de dezembro cuja semana fecha em
+ * janeiro conta lá num ano e aqui no seguinte.
+ */
 function graficoBatismos() {
-  const doAno = batismos.filter(b => b.data_batismo && deISO(b.data_batismo).getFullYear() === ano);
-  const series = FAIXAS.map(f => ({
-    nome: f.label,
-    cor: corDaArea(f.cor),
-    valores: MESES.map((_, m) =>
-      doAno.filter(b => deISO(b.data_batismo).getMonth() === m && faixaEtaria(b.idade, b.sexo) === f.key).length),
+  const mesDoRelatorio = (b) => deISO(domingoDaSemana(b.data_batismo));
+  const doAno = batismos.filter(b => b.data_batismo && mesDoRelatorio(b).getFullYear() === ano);
+
+  const agora = deISO(hoje());
+  const mesCorrente = ano < agora.getFullYear() ? 11 : ano > agora.getFullYear() ? -1 : agora.getMonth();
+  const ultimoCadastrado = Math.max(-1, ...doAno.map(b => mesDoRelatorio(b).getMonth()));
+  const meses = MESES.slice(0, Math.max(mesCorrente, ultimoCadastrado) + 1);
+  const noMes = (lista, m) => lista.filter(b => mesDoRelatorio(b).getMonth() === m);
+
+  const series = areas.map(a => ({
+    nome: a.nome,
+    cor: corDaArea(a.cor ?? 0),
+    valores: meses.map((_, m) => noMes(doAno.filter(b => b.area_id === a.id), m).length),
   }));
 
-  const temAlgo = series.some(s => s.valores.some(v => v > 0));
+  // Batismo sem área (área apagada, ou desativada em Configurações) não tem
+  // linha e fica de fora do funil e do consolidado, que somam só as áreas
+  // ativas. Aqui ele conta no Total, como na aba Batismos, e a diferença
+  // aparece numa coluna própria — antes ela ficava muda, e o Total desta
+  // tabela discordava do funil sem dizer por quê.
+  const ativas = new Set(areas.map(a => a.id));
+  const semArea = doAno.filter(b => !ativas.has(b.area_id));
+  const temAlgo = doAno.length > 0 && meses.length > 0;
 
   return moldura({
     titulo: 'Batismos por mês',
-    descricao: 'Faixa derivada de idade e sexo: Primária abaixo de 12, Rapazes e Moças de 12 a 17, Homens e Mulheres a partir de 18.',
+    descricao: 'Uma linha por área, pelo mês do relatório (o do domingo que fecha a semana). A faixa etária está na tabela.',
     figura: temAlgo
-      ? colunasEmpilhadas({ categorias: MESES.map(m => m.slice(0, 3)), series })
+      ? linhas({ categorias: meses.map(m => m.slice(0, 3)), series, marcadores: true })
       : vazio('Nenhum batismo registrado', `Cadastre na aba Batismos para ver o gráfico de ${ano}.`, '💧'),
     series: temAlgo ? series : [],
     tabela: temAlgo ? () => tabelaSimples(
-      ['Mês', ...FAIXAS.map(f => f.label), 'Total'],
-      MESES.map((m, i) => [m, ...series.map(s => n(s.valores[i])), n(soma(series, s => s.valores[i]))]),
+      ['Mês', ...areas.map(a => a.nome), ...(semArea.length ? ['Sem área ativa'] : []),
+        ...FAIXAS.map(f => f.label), 'Total'],
+      meses.map((nome, m) => {
+        const doMes = noMes(doAno, m);
+        return [
+          nome,
+          ...series.map(z => n(z.valores[m])),
+          ...(semArea.length ? [n(noMes(semArea, m).length)] : []),
+          ...FAIXAS.map(f => n(doMes.filter(b => faixaEtaria(b.idade, b.sexo) === f.key).length)),
+          n(doMes.length),
+        ];
+      }),
     ) : null,
-  });
-}
-
-function graficoCalor(ind) {
-  const recentes = domingosLancados(ano).slice(-16);
-  if (!recentes.length || !areas.length) return el('span');
-
-  const valores = areas.map(a => recentes.map(d => valor(d, a.id, ind.key) ?? 0));
-
-  return moldura({
-    titulo: `${ind.label} — semana × área`,
-    descricao: 'Últimos 16 domingos lançados. Mais escuro é mais alto.',
-    figura: mapaCalor({
-      colunas: recentes.map(dataCurta),
-      linhas: areas.map(a => a.nome),
-      valores,
-      rotuloValor: ind.label,
-    }),
-    tabela: () => tabelaSimples(
-      ['Área', ...recentes.map(dataCurta)],
-      areas.map((a, i) => [a.nome, ...valores[i].map(n)]),
-    ),
   });
 }
 

@@ -461,15 +461,22 @@ async function excluirDesignacao(d) {
 --------------------------------------------------------------------------- */
 
 function painelPlano() {
-  const textoDe = (secao) => plano.find(p => p.secao === secao)?.texto ?? '';
+  const linhaDe = (secao) => plano.find(p => p.secao === secao);
 
-  const salvar = async (secao, texto) => {
-    const existente = plano.find(p => p.secao === secao);
+  /**
+   * Grava um campo da seção — `texto` ou `titulo` — pela chave `secao`.
+   *
+   * Upsert, e não "existe? atualiza : insere": a linha da seção nasce no
+   * primeiro campo salvo, e editar o título e logo o texto de uma seção nova
+   * disparava dois inserts quase juntos — o segundo batia na unicidade de
+   * `secao` e o erro chegava com a mensagem de reserva de horário. O upsert só
+   * toca a coluna enviada, então gravar o título não apaga o texto.
+   */
+  const salvar = async (secao, campo, valor) => {
     try {
-      if (existente) await ctx.db.atualizar(COL_PLANO, existente.id, { texto, atualizado_em: new Date().toISOString() });
-      else await ctx.db.inserir(COL_PLANO, { secao, texto });
+      await ctx.db.gravarNaChave(COL_PLANO, { secao, [campo]: valor, atualizado_em: new Date().toISOString() });
       await recarregar();
-      toast('Plano salvo.', 'ok');
+      toast(campo === 'titulo' ? 'Título salvo.' : 'Plano salvo.', 'ok');
     } catch (err) { toast(err.message || 'Não foi possível salvar.', 'err'); }
   };
 
@@ -479,16 +486,31 @@ function painelPlano() {
         el('p', { class: 'small muted' },
           'O plano da ala para compartilhar o evangelho é feito pelo presidente do quórum de ' +
           'élderes, pela presidente da Sociedade de Socorro e pelo líder de missão, com aprovação ' +
-          'do bispo. Salva ao sair do campo.'),
+          'do bispo. Toque num título para renomear a seção. Tudo salva ao sair do campo.'),
       )),
     ...SECOES_PLANO.map(s => {
-      const txt = el('textarea', { class: 'textarea', rows: 4, placeholder: s.dica }, textoDe(s.key));
-      txt.addEventListener('change', () => salvar(s.key, txt.value.trim()));
+      const linha = linhaDe(s.key);
+
+      // O título é um campo que parece título: sem moldura até receber foco.
+      // Vazio volta ao padrão de SECOES_PLANO — por isso grava null, não ''.
+      const titulo = el('input', {
+        class: 'input input--titulo', value: linha?.titulo || s.titulo,
+        placeholder: s.titulo, 'aria-label': `Título da seção (padrão: ${s.titulo})`,
+        maxlength: '120',
+      });
+      // A dica saiu do cabeçalho e ficou só como texto de exemplo do campo
+      // vazio, onde ela ajuda sem ocupar a linha do título.
+      const txt = el('textarea', { class: 'textarea', rows: 4, placeholder: s.dica }, linha?.texto ?? '');
+
+      titulo.addEventListener('change', () => {
+        const v = titulo.value.trim();
+        if (!v) titulo.value = s.titulo;
+        salvar(s.key, 'titulo', v && v !== s.titulo ? v : null);
+      });
+      txt.addEventListener('change', () => salvar(s.key, 'texto', txt.value.trim()));
+
       return el('div', { class: 'card' },
-        el('div', { class: 'card__head' },
-          el('span', { class: 'card__title' }, s.titulo),
-          el('span', { class: 'small muted' }, s.dica),
-        ),
+        el('div', { class: 'card__head' }, titulo),
         el('div', { class: 'card__body' }, txt),
       );
     }),

@@ -2,13 +2,13 @@
  * Calendário de almoço dos missionários.
  *
  * Uma vaga por dupla em cada dia — a mesma grade da planilha, onde cada dia
- * tinha quatro linhas. Segunda é P-Day e fica bloqueada; terça mostra a
- * etiqueta da mesada mas aceita agendamento.
+ * tinha quatro linhas. Segunda é P-Day e fica bloqueada. Todo almoço é
+ * presencial: o app não pergunta mais como o almoço será fornecido.
  *
  * Depois de gravado, o membro não altera a própria escolha: só o LMA.
  */
 
-import { AREAS_PADRAO, MARCAS_SEMANA, MESES, MODALIDADES_ALMOCO, PERIODICIDADES, corDaArea } from '../config.js';
+import { AREAS_PADRAO, MARCAS_SEMANA, MESES, PERIODICIDADES, corDaArea } from '../config.js';
 import { ConflitoError } from '../db.js';
 import { chave, comparaNome, dataCurta, diasDoMes, hoje } from '../util.js';
 import { $, confirmar, el, modal, toast, vazio, conexao } from '../ui.js';
@@ -148,9 +148,11 @@ function celula(d, area, marca, passado) {
   const reserva = agenda.find(x => x.data === d.data && x.area_id === area.id);
 
   if (reserva) {
-    const modalidade = MODALIDADES_ALMOCO.find(m => m.key === reserva.modalidade);
+    // Só nome. O ícone distinguia presencial, quentinha e Pix; desde outubro
+    // de 2026 todo almoço é presencial, e um ícone igual em toda célula não
+    // diz nada.
     td.append(el('div', { class: 'row' },
-      el('span', {}, `${modalidade?.icone ?? '🍽️'} ${reserva.nome}`),
+      el('span', {}, reserva.nome),
       ctx.db.ehAdmin() && el('button', {
         class: 'btn btn--icon btn--ghost', type: 'button',
         'aria-label': `Liberar ${dataCurta(d.data)} — ${area.nome}`,
@@ -192,10 +194,7 @@ async function abrirReserva(d, area) {
   const datalist = el('datalist', { id: 'lista-vol' },
     ...voluntarios.map(v => el('option', { value: v.nome })));
 
-  const modalidade = el('select', { class: 'select' },
-    ...MODALIDADES_ALMOCO.map(m => el('option', { value: m.key }, `${m.icone} ${m.label}`)));
-
-  const obs = el('input', { class: 'input', placeholder: 'opcional — combinar horário, ponto de entrega…' });
+  const obs = el('input', { class: 'input', placeholder: 'opcional — horário, restrição alimentar…' });
 
   const corpo = el('div', {},
     el('div', { class: 'card', style: 'margin-bottom:1rem;background:var(--surface-2)' },
@@ -205,7 +204,6 @@ async function abrirReserva(d, area) {
       )),
     el('div', { class: 'field' }, el('label', {}, 'Nome'), nome, datalist,
       el('p', { class: 'field__hint' }, 'Se você já está na lista, o nome aparece ao digitar.')),
-    el('div', { class: 'field' }, el('label', {}, 'Como vai fornecer'), modalidade),
     el('div', { class: 'field' }, el('label', {}, 'Observação'), obs),
     el('p', { class: 'small muted' }, 'Depois de gravar, procure o LMA se precisar mudar.'),
   );
@@ -223,7 +221,6 @@ async function abrirReserva(d, area) {
           data: d.data,
           area_id: area.id,
           nome: v,
-          modalidade: modalidade.value,
           observacao: obs.value.trim() || null,
         });
       } catch (err) {
@@ -270,21 +267,19 @@ function painelVoluntarios() {
     const lista = voluntarios.filter(v => !q || chave(v.nome).includes(q));
 
     corpo.replaceChildren(...(lista.length ? lista.map(v => {
-      const m = MODALIDADES_ALMOCO.find(x => x.key === v.modalidade);
       const p = PERIODICIDADES.find(x => x.key === v.periodicidade);
       return el('tr', {},
         el('td', {}, el('strong', {}, v.nome)),
         el('td', { class: 'small' }, v.telefone || '—'),
         el('td', { class: 'small', style: 'white-space:normal;max-width:20rem' }, v.endereco || '—'),
         el('td', { class: 'num' }, v.duplas ?? 1),
-        el('td', { class: 'small' }, m ? `${m.icone} ${m.label}` : '—'),
         el('td', { class: 'small' }, p?.label ?? '—'),
         el('td', {}, el('div', { class: 'row' },
           el('button', { class: 'btn btn--icon btn--ghost', type: 'button', 'aria-label': `Editar ${v.nome}`, onclick: () => formVoluntario(v) }, '✏️'),
           el('button', { class: 'btn btn--icon btn--ghost', type: 'button', 'aria-label': `Excluir ${v.nome}`, onclick: () => excluirVoluntario(v) }, '🗑️'),
         )),
       );
-    }) : [el('tr', {}, el('td', { colspan: 7 },
+    }) : [el('tr', {}, el('td', { colspan: 6 },
       vazio(q ? 'Nenhum voluntário encontrado' : 'Lista vazia',
             q ? 'Tente outro nome.' : 'Cadastre quem se dispôs a fornecer almoço.', '👥')))]));
   };
@@ -301,7 +296,7 @@ function painelVoluntarios() {
       el('table', { class: 'table' },
         el('thead', {}, el('tr', {},
           el('th', {}, 'Nome'), el('th', {}, 'Telefone'), el('th', {}, 'Endereço'),
-          el('th', {}, 'Duplas'), el('th', {}, 'Modalidade'), el('th', {}, 'Periodicidade'), el('th', {}, ''),
+          el('th', {}, 'Duplas'), el('th', {}, 'Periodicidade'), el('th', {}, ''),
         )),
         corpo,
       )),
@@ -310,12 +305,10 @@ function painelVoluntarios() {
 
 function formVoluntario(v) {
   const nome     = el('input', { class: 'input', value: v?.nome ?? '' });
-  const telefone = el('input', { class: 'input', type: 'tel', value: v?.telefone ?? '', placeholder: '21 90000-0000' });
+  const telefone = el('input', { class: 'input', type: 'tel', value: v?.telefone ?? '', placeholder: '63 90000-0000' });
   const endereco = el('textarea', { class: 'textarea', rows: 2 }, v?.endereco ?? '');
   const duplas   = el('select', { class: 'select' },
     ...[1, 2, 3, 4].map(n => el('option', { value: n, selected: (v?.duplas ?? 1) === n }, `${n} dupla${n > 1 ? 's' : ''}`)));
-  const modalidade = el('select', { class: 'select' },
-    ...MODALIDADES_ALMOCO.map(m => el('option', { value: m.key, selected: v?.modalidade === m.key }, `${m.icone} ${m.label}`)));
   const periodicidade = el('select', { class: 'select' },
     ...PERIODICIDADES.map(p => el('option', { value: p.key, selected: (v?.periodicidade ?? 'livre') === p.key }, p.label)));
   const obs = el('textarea', { class: 'textarea', rows: 2 }, v?.observacoes ?? '');
@@ -326,7 +319,6 @@ function formVoluntario(v) {
     el('div', { class: 'field' }, el('label', {}, 'Endereço'), endereco),
     el('div', { class: 'field' }, el('label', {}, 'Quantas duplas consegue atender'), duplas,
       el('p', { class: 'field__hint' }, 'Era a coluna "Duplas" da planilha — quantas duplas, não quantas porções.')),
-    el('div', { class: 'field' }, el('label', {}, 'Como fornece'), modalidade),
     el('div', { class: 'field' }, el('label', {}, 'Periodicidade preferida'), periodicidade),
     el('div', { class: 'field' }, el('label', {}, 'Observações'), obs),
   );
@@ -340,7 +332,6 @@ function formVoluntario(v) {
         telefone: telefone.value.trim() || null,
         endereco: endereco.value.trim() || null,
         duplas: Number(duplas.value),
-        modalidade: modalidade.value,
         periodicidade: periodicidade.value,
         observacoes: obs.value.trim() || null,
       };

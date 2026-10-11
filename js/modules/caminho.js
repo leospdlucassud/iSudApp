@@ -298,7 +298,14 @@ function painelMarcos() {
             el('td', { class: 'nowrap', style: 'font-weight:600' }, p.nome),
             ...MARCOS_ITENS.map(item => {
               const cabe = aplicaveis.some(a => a.key === item.key);
-              if (!cabe) return el('td', {}, el('span', { class: 'small muted' }, '·'));
+              // Marco que não se aplica (sacerdócio, para irmãs): traço centralizado
+              // no mesmo quadrado dos outros, para a grade não perder o alinhamento.
+              // Era um ponto pequeno no canto da célula, que lia como sujeira.
+              if (!cabe) {
+                return el('td', {}, el('span', { class: 'slot slot--na', title: 'Não se aplica' },
+                  el('span', { 'aria-hidden': 'true' }, '–'),
+                  el('span', { class: 'sr-only' }, `${item.label}: não se aplica`)));
+              }
               const feito = marcoFeito(p.id, item.key);
               return el('td', {}, el('button', {
                 class: 'slot', type: 'button', 'aria-pressed': String(!!feito),

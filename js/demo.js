@@ -26,7 +26,7 @@ import {
   AREAS_PADRAO, DIAS, HORARIOS, MARCAS_SEMANA, MARCOS_ITENS,
   PARTICIPANTES_COORDENACAO, SECOES_PLANO,
 } from './config.js';
-import { deISO, diasDoMes, diasEntre, domingoDaSemana, hoje, iso, somaDias, uuid } from './util.js';
+import { deISO, diasDoMes, diasEntre, domingoDaSemana, hoje, iso, somaDias } from './util.js';
 
 /* ---------------------------------------------------------------------------
    Sorteio reprodutível (mulberry32)
@@ -56,19 +56,19 @@ const DUPLAS = {
 };
 
 const VOLUNTARIOS = [
-  { nome: 'Família Albuquerque', modalidade: 'presencial', periodicidade: 'primeiroDom', duplas: 2 },
-  { nome: 'Irmã Helena Batista', modalidade: 'presencial', periodicidade: 'livre',       duplas: 1 },
-  { nome: 'Família Cardoso',     modalidade: 'quentinha',  periodicidade: 'duasVezesMes', duplas: 2 },
-  { nome: 'Irmão Jorge Dantas',  modalidade: 'pix',        periodicidade: 'fimMes',      duplas: 1 },
-  { nome: 'Família Esteves',     modalidade: 'presencial', periodicidade: 'livre',       duplas: 2 },
-  { nome: 'Irmã Lúcia Fontes',   modalidade: 'quentinha',  periodicidade: 'inicioMes',   duplas: 1 },
-  { nome: 'Família Guimarães',   modalidade: 'presencial', periodicidade: 'ultimoDom',   duplas: 2 },
-  { nome: 'Irmão Renato Holanda', modalidade: 'presencial', periodicidade: 'livre',      duplas: 1 },
-  { nome: 'Família Igarashi',    modalidade: 'pix',        periodicidade: 'livre',       duplas: 1 },
-  { nome: 'Irmã Marta Junqueira', modalidade: 'presencial', periodicidade: 'duasVezesMes', duplas: 1 },
+  { nome: 'Família Albuquerque', periodicidade: 'primeiroDom', duplas: 2 },
+  { nome: 'Irmã Helena Batista', periodicidade: 'livre',       duplas: 1 },
+  { nome: 'Família Cardoso',     periodicidade: 'duasVezesMes', duplas: 2 },
+  { nome: 'Irmão Jorge Dantas',  periodicidade: 'fimMes',      duplas: 1 },
+  { nome: 'Família Esteves',     periodicidade: 'livre',       duplas: 2 },
+  { nome: 'Irmã Lúcia Fontes',   periodicidade: 'inicioMes',   duplas: 1 },
+  { nome: 'Família Guimarães',   periodicidade: 'ultimoDom',   duplas: 2 },
+  { nome: 'Irmão Renato Holanda', periodicidade: 'livre',      duplas: 1 },
+  { nome: 'Família Igarashi',    periodicidade: 'livre',       duplas: 1 },
+  { nome: 'Irmã Marta Junqueira', periodicidade: 'duasVezesMes', duplas: 1 },
 ];
 
-const OBS_ALMOCO = ['Sem lactose para o élder Pacheco', 'Levo até a capela', 'Almoço às 13h', null, null, null];
+const OBS_ALMOCO = ['Sem lactose para o élder Pacheco', 'Almoço às 13h', 'Moramos ao lado da capela', null, null, null];
 
 /** Membros que se ofereceram para acompanhar lições: [nome, modalidade, [dia, horário]...] */
 const DISPONIVEIS = [
@@ -159,14 +159,27 @@ const DESIGNACOES = [
    Geração
 --------------------------------------------------------------------------- */
 
-/** Quantas semanas de relatório: seis meses dão corpo aos gráficos. */
-const SEMANAS = 26;
+/**
+ * Janela da história, em semanas: quem é ensinado, batizado e acompanhado
+ * cabe nos últimos seis meses. Os índices `entra` e `batiza` de ENSINADOS
+ * contam a partir do começo desta janela.
+ *
+ * Os números semanais do relatório vão além: cobrem o ano corrente inteiro.
+ * Com só 26 semanas, os gráficos do ano saíam com janeiro a abril colados no
+ * zero, e numa apresentação isso lê como "o app não tinha dados".
+ */
+const HISTORIA = 26;
 
 /**
- * Grava a demonstração inteira no backend recebido.
- * @param {{ inserirVarios: (colecao: string, linhas: object[]) => Promise<object[]> }} backend
+ * Gera a demonstração inteira, sem gravar nada: devolve { colecao: linhas }.
+ *
+ * Função pura de propósito — mesma data, mesmo resultado, até nos ids. Quem
+ * grava é o db.js, escrevendo cada coleção INTEIRA. Duas abas abrindo a
+ * demonstração ao mesmo tempo já semearam por cima uma da outra e deixaram
+ * tudo em dobro (as áreas inclusive, e com elas todos os totais da ala);
+ * escrevendo o mesmo conteúdo determinístico, a corrida vira inofensiva.
  */
-export async function semear(backend) {
+export function gerar() {
   const r = sorteador(20260917);
   const entre = (min, max) => min + Math.floor(r() * (max - min + 1));
   const chance = (p) => r() < p;
@@ -177,7 +190,12 @@ export async function semear(backend) {
   // FECHA a semana, que fica no futuro em qualquer dia que não seja domingo.
   const fecha = domingoDaSemana(HOJE);
   const ultimo = fecha > HOJE ? somaDias(fecha, -7) : fecha;
-  const domingos = Array.from({ length: SEMANAS }, (_, i) => somaDias(ultimo, -7 * (SEMANAS - 1 - i)));
+  // Do primeiro domingo do ano até o último que passou — ou as 26 semanas da
+  // história, se o ano ainda for mais curto que isso (apresentação em março).
+  const doAno = Math.floor(diasEntre(`${ultimo.slice(0, 4)}-01-01`, ultimo) / 7) + 1;
+  const total = Math.max(HISTORIA, doAno);
+  const domingos = Array.from({ length: total }, (_, i) => somaDias(ultimo, -7 * (total - 1 - i)));
+  const base = total - HISTORIA;  // onde a janela da história começa
   const sabadoAntes = (domingo) => somaDias(domingo, -1);
 
   /** Primeiro sábado em ou depois de uma data. */
@@ -216,7 +234,7 @@ export async function semear(backend) {
     ...v,
     telefone: tel(100 + i),
     endereco: `Rua ${['das Palmeiras', 'dos Ipês', 'do Buriti', 'das Acácias', 'da Serra'][i % 5]}, ${100 + i * 17}`,
-    observacoes: v.modalidade === 'pix' ? 'Prefere contribuir por Pix quando não pode receber' : null,
+    observacoes: i === 3 ? 'Pede para avisar com dois dias de antecedência' : null,
   }));
 
   L.almoco_agenda = [];
@@ -232,8 +250,7 @@ export async function semear(backend) {
         if (!chance(p)) continue;
         const v = um(VOLUNTARIOS);
         L.almoco_agenda.push({
-          data: d.data, area_id: area, nome: v.nome,
-          modalidade: v.modalidade, observacao: um(OBS_ALMOCO),
+          data: d.data, area_id: area, nome: v.nome, observacao: um(OBS_ALMOCO),
         });
       }
     }
@@ -272,15 +289,14 @@ export async function semear(backend) {
 
   /* --- Relatório semanal e frequência ---------------------------------------- */
 
-  // Leve crescimento ao longo dos seis meses, com a Sul um pouco menor: é a
-  // história que o gráfico conta numa apresentação.
+  // Leve crescimento ao longo do ano, com a Sul um pouco menor: é a história
+  // que o gráfico conta numa apresentação.
   const ESCALA = { area1: 1, area2: 0.8 };
-  const parte = (total, teto = total) => Math.min(total, entre(0, teto));
 
   L.relatorio_semanal = [];
   L.frequencia_ala = [];
   domingos.forEach((data, i) => {
-    const t = i / (SEMANAS - 1);
+    const t = i / (domingos.length - 1);
     for (const area of ['area1', 'area2']) {
       const k = ESCALA[area];
       const n = (base, ganho, folga) => Math.max(0, Math.round((base + ganho * t + r() * folga) * k));
@@ -294,14 +310,9 @@ export async function semear(backend) {
         referencias: n(0, 2, 3),
         licoes_membro: n(3, 4, 3),
         outras_licoes: n(8, 6, 6),
-        novas_pessoas_casados: parte(novas, 2),
-        novas_pessoas_homens: parte(novas),
+        // Só o total: Casados e Homens adultos deixaram de ser lançados.
         novas_pessoas_total: novas,
-        novos_com_data_casados: parte(novosData, 1),
-        novos_com_data_homens: parte(novosData),
         novos_com_data_total: novosData,
-        total_com_data_casados: parte(totalData, 2),
-        total_com_data_homens: parte(totalData),
         total_com_data_total: totalData,
         sacramental: n(2, 3, 2),
       });
@@ -318,18 +329,18 @@ export async function semear(backend) {
   for (const p of ENSINADOS) {
     const batizou = p.batiza != null;
     const dataBatismo = batizou
-      ? sabadoAntes(domingos[p.batiza])
+      ? sabadoAntes(domingos[base + p.batiza])
       : p.futuro != null ? sabadoApos(somaDias(HOJE, p.futuro)) : null;
     // Data marcada três semanas antes do batismo; quem ainda não foi batizado
     // e tem data já a vê em todas as semanas recentes.
-    const marcaEm = batizou ? p.batiza - 3 : SEMANAS - 4;
-    const ate = batizou ? p.batiza - 1 : SEMANAS - 1;
+    const marcaEm = batizou ? p.batiza - 3 : HISTORIA - 4;
+    const ate = batizou ? p.batiza - 1 : HISTORIA - 1;
 
     let sacramentais = 0;
     for (let w = p.entra; w <= ate; w++) {
       if (chance(0.8)) sacramentais++;
       L.progredindo.push({
-        data: domingos[w], nome: p.nome, area_id: p.area,
+        data: domingos[base + w], nome: p.nome, area_id: p.area,
         sacramentais,
         data_batismo: dataBatismo && w >= marcaEm ? dataBatismo : null,
         organizacao: p.org,
@@ -341,11 +352,11 @@ export async function semear(backend) {
     L.batismos.push({
       nome: p.nome, sexo: p.sexo, idade: p.idade, area_id: p.area,
       data_batismo: dataBatismo,
-      data_confirmacao: domingos[p.batiza],
+      data_confirmacao: domingos[base + p.batiza],
       familia_completa: p.familia,
     });
     L.caminho_pessoas.push({
-      id: uuid(), nome: p.nome, tipo: 'recemConverso', area_id: p.area, sexo: p.sexo,
+      id: `demo-${HOJE}-pessoa-${L.caminho_pessoas.length}`, nome: p.nome, tipo: 'recemConverso', area_id: p.area, sexo: p.sexo,
       data_inicio: dataBatismo, telefone: tel(300 + L.caminho_pessoas.length),
       consentimento: true, observacoes: null, ativo: true,
     });
@@ -353,7 +364,7 @@ export async function semear(backend) {
 
   for (const a of ACOMPANHADOS_ANTIGOS) {
     L.caminho_pessoas.push({
-      id: uuid(), nome: a.nome, tipo: a.tipo, area_id: a.area, sexo: a.sexo,
+      id: `demo-${HOJE}-pessoa-${L.caminho_pessoas.length}`, nome: a.nome, tipo: a.tipo, area_id: a.area, sexo: a.sexo,
       data_inicio: somaDias(ultimo, -a.diasAtras), telefone: tel(300 + L.caminho_pessoas.length),
       consentimento: a.consentimento,
       observacoes: a.tipo === 'retornando' ? 'Voltou a frequentar depois de visita dos ministradores.' : null,
@@ -405,8 +416,8 @@ export async function semear(backend) {
 
   // Seis reuniões semanais, a mais recente no último domingo.
   const reunioes = Array.from({ length: 6 }, (_, k) => ({
-    id: uuid(),
-    data: domingos[SEMANAS - 1 - k],
+    id: `demo-${HOJE}-reuniao-${k}`,
+    data: domingos[domingos.length - 1 - k],
     observacoes: k === 0
       ? 'Foco da semana: carona e entrevista do irmão Antônio, e as vagas de almoço em aberto.'
       : k === 3 ? 'Batismo da Larissa confirmado; Moças vão recebê-la no domingo.' : null,
@@ -441,7 +452,5 @@ export async function semear(backend) {
     { email: 'secretario@example.com', nome: 'Secretário da ala (demonstração)', dono: false, criado_em: somaDias(HOJE, -60) + 'T12:00:00Z' },
   ];
 
-  for (const [colecao, linhas] of Object.entries(L)) {
-    await backend.inserirVarios(colecao, linhas);
-  }
+  return L;
 }

@@ -244,7 +244,14 @@ function pintarFaixaDeDemonstracao() {
       { confirmar: 'Recomeçar', tom: 'primary' },
     );
     if (!ok) return;
-    await db.recomecarDemonstracao();
+    try {
+      await db.recomecarDemonstracao();
+    } catch (err) {
+      // A carga nova é montada antes de apagar a antiga, então uma falha aqui
+      // deixa a demonstração como estava — só falta dizer isso.
+      console.error('[demo] falha ao recomeçar:', err);
+      return toast('Não foi possível recomeçar agora. Os dados atuais continuam.', 'err', 6000);
+    }
     location.reload();
   };
 
@@ -253,7 +260,10 @@ function pintarFaixaDeDemonstracao() {
     location.replace('/');
   };
 
-  $('.sr-only').after(el('div', { class: 'demo-faixa', role: 'note' },
+  // Logo depois do "pular para o conteúdo", que precisa continuar sendo o
+  // primeiro foco da página. Pelo href, não por `.sr-only`: outros elementos
+  // usam essa classe.
+  $('a[href="#conteudo"]').after(el('div', { class: 'demo-faixa', role: 'note' },
     el('span', {},
       el('strong', {}, '🎭 Demonstração'),
       ' — dados fictícios, guardados só neste navegador. Nada aqui chega ao banco da ala.'),
@@ -318,6 +328,28 @@ function moduloDaURL() {
 
 /** Credenciais existem, mas não deu para conectar. */
 function telaSemConexao() {
+  // A tela prometia "o app volta sozinho quando a internet voltar" e nada
+  // escutava a volta. Agora escuta: a rede volta, a página recarrega.
+  addEventListener('online', () => location.reload(), { once: true });
+
+  // Na demonstração não há banco nem bloqueador envolvidos: o que falhou foi
+  // carregar o arquivo com os dados de exemplo, quase sempre por falta de rede.
+  if (db.emDemonstracao()) {
+    return el('div', {},
+      el('div', { class: 'page-head' },
+        el('h2', {}, '📡 Não foi possível montar a demonstração'),
+        el('p', {}, 'Os dados de exemplo não carregaram. Geralmente é falta de internet.'),
+      ),
+      el('div', { class: 'card' }, el('div', { class: 'card__body' },
+        el('p', { class: 'small muted', style: 'margin-bottom:1rem' },
+          'Quando a internet voltar, a página tenta de novo sozinha.'),
+        el('button', { class: 'btn btn--primary', type: 'button', onclick: () => location.reload() },
+          'Tentar de novo'),
+        el('p', { class: 'small muted', style: 'margin-top:1rem' }, db.erroDeConexao()),
+      )),
+    );
+  }
+
   return el('div', {},
     el('div', { class: 'page-head' },
       el('h2', {}, '📡 Sem conexão com o banco de dados'),
