@@ -462,21 +462,36 @@ function painelGraficos() {
   );
 }
 
+/**
+ * Os seis indicadores-chave do mês, comparados com o mês anterior.
+ *
+ * A comparação é pela MÉDIA POR DOMINGO, e só com domingos que já passaram.
+ * Antes somava o mês inteiro — os domingos ainda por vir entravam valendo
+ * zero — e comparava com o mês anterior completo. No dia 11, com dois
+ * domingos de quatro lançados, todo indicador aparecia caindo pela metade, em
+ * vermelho, todo mês. A média também iguala mês de cinco domingos com mês de
+ * quatro, que a soma pura favorecia.
+ *
+ * O número grande continua sendo o total do mês até aqui.
+ */
 function cartoesChave(doMes, doMesAnterior, domingosAno) {
   const ultimos12 = domingosAno.slice(-12);
+  const hj = hoje();
+  const passados = doMes.filter(d => d <= hj);
+  const anteriores = doMesAnterior.filter(d => d <= hj);
+  const media = (domingos, key) => totalNoPeriodo(domingos, key) / domingos.length;
 
   return el('div', { class: 'grid grid--kpi', style: 'margin-bottom:1rem' },
-    ...INDICADORES_CHAVE.map((ind, i) => {
-      const atual = totalNoPeriodo(doMes, ind.key);
-      const antes = totalNoPeriodo(doMesAnterior, ind.key);
-      return cartaoIndicador({
-        rotulo: `${ind.pmg}. ${ind.label}`,
-        valor: atual,
-        variacao: variacao(antes, atual),
-        serie: ultimos12.map(d => valorAla(d, ind.key)),
-        cor: corDaArea(i),
-      });
-    }),
+    ...INDICADORES_CHAVE.map((ind, i) => cartaoIndicador({
+      rotulo: `${ind.pmg}. ${ind.label}`,
+      valor: totalNoPeriodo(passados, ind.key),
+      variacao: passados.length && anteriores.length
+        ? variacao(media(anteriores, ind.key), media(passados, ind.key))
+        : null,
+      nota: passados.length ? 'sem base anterior' : 'nenhum domingo ainda',
+      serie: ultimos12.map(d => valorAla(d, ind.key)),
+      cor: corDaArea(i),
+    })),
   );
 }
 

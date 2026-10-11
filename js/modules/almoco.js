@@ -79,7 +79,7 @@ function pintar() {
         ctx.db.ehAdmin() && botaoAba('voluntarios', `👥 Voluntários (${voluntarios.length})`),
       ),
       el('span', { class: 'spacer' }),
-      conexao(ctx.db.temBackend() ? 'live' : 'off'),
+      conexao(ctx.db.estadoDaConexao()),
     ),
     aba === 'voluntarios' ? painelVoluntarios() : painelCalendario(),
   );

@@ -16,7 +16,7 @@ import {
 import { cartaoIndicador } from '../charts.js';
 import { alertasDoCaminho, precisaDeAtencao } from '../regras.js';
 import {
-  comparaNome, dataCurta, dataLonga, diasEntre, domingoDaSemana, hoje, somaDias,
+  chave, comparaNome, dataCurta, dataLonga, diasEntre, domingoDaSemana, hoje, somaDias,
 } from '../util.js';
 import { confirmar, el, modal, toast, vazio } from '../ui.js';
 
@@ -87,8 +87,18 @@ function pauta(dataRef) {
     .filter(p => p.data === semana)
     .sort((a, b) => comparaNome(a.nome, b.nome));
 
-  const comData = progredindo
-    .filter(p => p.data_batismo && p.data_batismo >= dataRef)
+  // Progredindo tem uma linha por pessoa POR SEMANA, e a data de batismo se
+  // repete em cada uma. Sem deduplicar, quem estava com data marcada havia
+  // quatro semanas aparecia quatro vezes na pauta. Fica a linha mais recente
+  // de cada pessoa — a que traz a data atual, se ela foi remarcada — e só
+  // então se olha se a data ainda está por vir.
+  const comData = [...new Map(
+    progredindo
+      .filter(p => p.data_batismo)
+      .sort((a, b) => String(a.data).localeCompare(String(b.data)))
+      .map(p => [`${chave(p.nome)}|${p.area_id}`, p]),
+  ).values()]
+    .filter(p => p.data_batismo >= dataRef)
     .sort((a, b) => a.data_batismo.localeCompare(b.data_batismo));
 
   const emAtraso = camPessoas

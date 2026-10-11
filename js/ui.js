@@ -247,7 +247,7 @@ export function carregando(texto = 'Carregando…') {
 
 /** Indicador de estado da sincronização. */
 export function conexao(estado = 'sync') {
-  const rotulos = { live: 'Sincronizado', sync: 'Conectando…', off: 'Offline' };
+  const rotulos = { live: 'Sincronizado', sync: 'Conectando…', off: 'Offline', demo: 'Demonstração' };
   return el('span', { class: `conn conn--${estado}` },
     el('span', { class: 'conn__dot' }),
     rotulos[estado] ?? estado,

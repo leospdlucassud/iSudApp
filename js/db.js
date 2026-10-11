@@ -67,9 +67,13 @@ export function aoMudarSessao(cb) {
    Backend local
    ========================================================================== */
 
-function backendLocal() {
-  const PREFIXO = 'om_dados_';
-  const canal = 'BroadcastChannel' in self ? new BroadcastChannel('om_sync') : null;
+/**
+ * @param {string} PREFIXO chave do localStorage. A demonstração usa um prefixo
+ *   próprio para nunca misturar os dados fictícios com os do desenvolvimento.
+ * @param {string} nomeDoCanal idem, para as abas não trocarem avisos entre si.
+ */
+function backendLocal(PREFIXO = 'om_dados_', nomeDoCanal = 'om_sync') {
+  const canal = 'BroadcastChannel' in self ? new BroadcastChannel(nomeDoCanal) : null;
   const ouvintes = new Map(); // coleção -> Set<callback>
 
   const ler     = (c) => { try { return JSON.parse(localStorage.getItem(PREFIXO + c)) ?? []; } catch { return []; } };
@@ -394,7 +398,90 @@ const ehDesenvolvimento = () =>
 let semConfiguracao = false;
 let falhaAoConectar = null;
 
+/* ---------------------------------------------------------------------------
+   Modo demonstração — `?demo` na URL
+
+   Para apresentar o app sem expor a ala. Os dados são fictícios (js/demo.js),
+   moram só no localStorage deste navegador, com prefixo próprio, e o Supabase
+   nem chega a ser carregado: o desvio acontece aqui, antes de qualquer
+   conexão. Não há caminho por onde um dado da demonstração chegue ao banco,
+   nem por onde um dado do banco apareça na demonstração.
+
+   O que liga o modo é a URL; o que o mantém é o sessionStorage, que morre com
+   a aba. Fechar a aba encerra a demonstração, e quem abrir o endereço normal
+   depois cai no app de verdade.
+
+   Toda entrada nova começa com dados recém-gerados, porque as datas saem do
+   dia de hoje: uma carga de semanas atrás abriria os calendários vazios.
+   Recarregar a página dentro da demonstração preserva o que o apresentador
+   mexeu.
+--------------------------------------------------------------------------- */
+
+const PREFIXO_DEMO = 'om_demo_';
+const MARCA_SEMEADO = PREFIXO_DEMO + '_semeado';
+let demo = false;
+
+function apagarDadosDaDemonstracao() {
+  for (const k of Object.keys(localStorage)) {
+    if (k.startsWith(PREFIXO_DEMO)) localStorage.removeItem(k);
+  }
+}
+
+async function semearDemonstracao() {
+  const { semear } = await import('./demo.js');
+  await semear(backend);
+  localStorage.setItem(MARCA_SEMEADO, new Date().toISOString());
+}
+
+/** Liga a demonstração se a URL pedir. Devolve se ela está ativa nesta aba. */
+function ligarDemonstracaoSePedida() {
+  const pedida = new URLSearchParams(location.search).has('demo');
+  if (pedida && sessionStorage.getItem('om_demo') !== '1') {
+    sessionStorage.setItem('om_demo', '1');
+    apagarDadosDaDemonstracao();
+    // A apresentação começa pelas telas do LMA, que são as que têm o que
+    // mostrar. O botão de papel no cabeçalho alterna para a visão de membro.
+    entrarEmPrevia();
+  }
+  return sessionStorage.getItem('om_demo') === '1';
+}
+
+export const emDemonstracao = () => demo;
+
+/**
+ * O que o selo de conexão das agendas deve dizer.
+ *
+ * Na demonstração o backend é o local, e o selo antigo dizia "Offline" — em
+ * vermelho, na frente de uma plateia, parecendo defeito.
+ * @returns {'live'|'off'|'demo'}
+ */
+export const estadoDaConexao = () => (demo ? 'demo' : ehSupabase ? 'live' : 'off');
+
+/** Descarta o que foi mexido durante a apresentação e gera tudo de novo. */
+export async function recomecarDemonstracao() {
+  if (!demo) return;
+  apagarDadosDaDemonstracao();
+  await semearDemonstracao();
+}
+
+/** Sai da demonstração sem deixar rastro neste navegador. */
+export function sairDaDemonstracao() {
+  apagarDadosDaDemonstracao();
+  sessionStorage.removeItem('om_demo');
+  sessionStorage.removeItem('om_previa');
+  previa = false;
+  demo = false;
+}
+
 export async function iniciar() {
+  demo = ligarDemonstracaoSePedida();
+  if (demo) {
+    backend = backendLocal(PREFIXO_DEMO, 'om_demo_sync');
+    await backend.iniciar();
+    if (!localStorage.getItem(MARCA_SEMEADO)) await semearDemonstracao();
+    return backend.nome;
+  }
+
   let cfg = null;
   try {
     cfg = await import('./supabase-config.js');

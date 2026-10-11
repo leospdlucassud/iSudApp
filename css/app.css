@@ -731,6 +731,34 @@ code {
 }
 @keyframes shimmer { to { background-position: -200% 0; } }
 
+/* Faixa do modo demonstração
+   ---------------------------------------------------------------------------
+   Dourada como o selo LMA, para ler como aviso da casa e não como erro. Não é
+   sticky de propósito: a barra de módulos e os cabeçalhos de tabela já
+   disputam o topo, e a faixa precisa ser vista ao abrir, não perseguir. O
+   título da aba também ganha "Demonstração —". */
+.demo-faixa {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: .5rem 1rem;
+  padding: .5rem 1rem;
+  background: var(--realce-suave);
+  border-bottom: 1px solid var(--gold-dim);
+  color: var(--text);
+  font-size: .8125rem;
+  text-align: center;
+}
+.demo-faixa__acoes { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: .5rem; }
+.demo-faixa__btn {
+  padding: .25rem .75rem;
+  border: 1px solid var(--gold-dim);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-size: .75rem;
+  font-weight: 600;
+}
+.demo-faixa__btn:hover { background: var(--surface-2); }
+
 /* Carregando
    ---------------------------------------------------------------------------
    O atraso de 300ms é o ponto todo: numa conexão boa a tela de verdade chega
@@ -774,6 +802,7 @@ code {
 .conn--live  .conn__dot { background: var(--success); box-shadow: 0 0 0 3px var(--success-soft); }
 .conn--off   .conn__dot { background: var(--danger); }
 .conn--sync  .conn__dot { background: var(--warning); animation: pulse 1.2s infinite; }
+.conn--demo  .conn__dot { background: var(--gold-dim); }
 @keyframes pulse { 50% { opacity: .3; } }
 
 /* ==========================================================================

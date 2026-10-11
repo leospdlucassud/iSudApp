@@ -107,7 +107,7 @@ function pintar() {
         }, a.rotulo)),
       ),
       el('span', { class: 'spacer' }),
-      conexao(ctx.db.temBackend() ? 'live' : 'off'),
+      conexao(ctx.db.estadoDaConexao()),
     ),
     paineis[aba](),
   );

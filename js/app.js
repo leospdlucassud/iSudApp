@@ -3,7 +3,7 @@
 import { CODIGO_POR_EMAIL, INICIO, MODULOS } from './config.js';
 import * as db from './db.js';
 import {
-  $, el, modal, toast,
+  $, el, modal, toast, confirmar,
   aplicarTema, alternarTema, temaAtual,
   aplicarFonte, ajustarFonte,
   carregando, vazio,
@@ -79,6 +79,14 @@ function ligarCabecalho() {
 
 async function entrarComoAdmin() {
   if (db.ehAdmin()) return;
+  // Na demonstração não há o que validar: o botão só alterna a visão, para o
+  // apresentador mostrar o app pelos dois lados.
+  if (db.emDemonstracao()) {
+    db.entrarEmPrevia();
+    await aoMudarDePapel();
+    toast('Visão do líder de missão da ala.', 'ok');
+    return;
+  }
   if (!db.temBackend()) return entrarEmPrevia();
   await telaDeSenha();
 }
@@ -216,7 +224,44 @@ async function telaDeConferirCodigo(email) {
 async function sairDoAdmin() {
   await db.sair();
   await aoMudarDePapel();
-  toast('Você saiu do acesso de líder.');
+  toast(db.emDemonstracao() ? 'Visão de membro da ala.' : 'Você saiu do acesso de líder.');
+}
+
+/* ---------------------------------------------------------------------------
+   Faixa da demonstração
+
+   Fica no topo de todas as telas enquanto o modo durar. Numa apresentação
+   projetada, ninguém na sala pode sair achando que aqueles nomes são da ala.
+--------------------------------------------------------------------------- */
+
+function pintarFaixaDeDemonstracao() {
+  document.title = `Demonstração — ${document.title}`;
+
+  const recomecar = async () => {
+    const ok = await confirmar(
+      'Recomeçar a demonstração?',
+      'Os dados fictícios voltam ao estado inicial. O que foi mexido durante a apresentação se perde.',
+      { confirmar: 'Recomeçar', tom: 'primary' },
+    );
+    if (!ok) return;
+    await db.recomecarDemonstracao();
+    location.reload();
+  };
+
+  const sair = () => {
+    db.sairDaDemonstracao();
+    location.replace('/');
+  };
+
+  $('.sr-only').after(el('div', { class: 'demo-faixa', role: 'note' },
+    el('span', {},
+      el('strong', {}, '🎭 Demonstração'),
+      ' — dados fictícios, guardados só neste navegador. Nada aqui chega ao banco da ala.'),
+    el('span', { class: 'demo-faixa__acoes' },
+      el('button', { class: 'demo-faixa__btn', type: 'button', onclick: recomecar }, 'Recomeçar dados'),
+      el('button', { class: 'demo-faixa__btn', type: 'button', onclick: sair }, 'Sair da demonstração'),
+    ),
+  ));
 }
 
 /** Repinta tudo e volta à tela inicial, que muda de conteúdo conforme o papel. */
@@ -402,6 +447,7 @@ async function iniciar() {
   // a biblioteca do Supabase e fala com o servidor, e era aqui que a tela
   // ficava em branco.
   await db.iniciar();
+  if (db.emDemonstracao()) pintarFaixaDeDemonstracao();
   pintarPapel();
 
   // A sessão resolve depois do primeiro render — seja restaurada do
