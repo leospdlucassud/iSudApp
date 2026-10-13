@@ -27,6 +27,16 @@ const COL_AGENDA = 'licoes_agenda';
 let ctx, raiz;
 let aba = null;
 let modalidadeVista = 'presencial';
+/** Modalidade da grade em Minha disponibilidade — à parte da de Disponibilidade da ala. */
+let modalidadeForm = 'presencial';
+/**
+ * Recibo de Minha disponibilidade: { nome, registros } depois de enviar.
+ *
+ * No módulo, e não só na tela: o aviso de tempo real que chega logo depois
+ * do envio (o próprio envio dispara um) repinta a aba, e com o recibo só no
+ * DOM ele sumia meio segundo depois de aparecer, voltando ao formulário vazio.
+ */
+let reciboMinha = null;
 let ano, mes;
 let areas = [], disponibilidade = [], agenda = [];
 let desligarRealtime = null;
@@ -34,6 +44,10 @@ let desligarRealtime = null;
 export async function montar(alvo, contexto) {
   ctx = contexto;
   raiz = alvo;
+  // Entrar de novo na tela começa sem recibo: num aparelho compartilhado, a
+  // próxima pessoa não precisa ver o nome e os horários de quem enviou antes.
+  // Repinturas sem sair da tela (o tempo real) não passam por aqui.
+  reciboMinha = null;
 
   const agora = new Date();
   ano ??= agora.getFullYear();
@@ -58,6 +72,26 @@ export async function montar(alvo, contexto) {
 async function aoMudarRemoto() {
   await recarregar();
   if (raiz.isConnected) pintar();
+}
+
+/**
+ * O que esta tela está mostrando, para o cabeçalho do papel e o nome do PDF.
+ * Lido na hora de imprimir — ver js/impressao.js.
+ */
+export function impressao() {
+  const rotulo = (key) => MODALIDADES_LICAO.find(m => m.key === key)?.label;
+  const porAba = {
+    // Cada aba tem a SUA modalidade: descrever a da ala no formulário fazia o
+    // papel dizer "Presencial" sobre uma grade de vídeo chamada.
+    minha:  {
+      nome: 'Minha disponibilidade',
+      detalhe: reciboMinha ? `Disponibilidade enviada por ${reciboMinha.nome}` : rotulo(modalidadeForm),
+    },
+    semana: { nome: 'Disponibilidade da ala', detalhe: rotulo(modalidadeVista) },
+    agenda: { nome: 'Lições marcadas', detalhe: `${MESES[mes]} de ${ano}` },
+  };
+  const a = porAba[aba] ?? porAba.agenda;
+  return { titulo: `Lições com os missionários — ${a.nome}`, detalhe: a.detalhe };
 }
 
 async function recarregar() {
@@ -174,9 +208,10 @@ function painelMinha() {
       ));
   };
 
+  if (reciboMinha) return recibo(reciboMinha.nome, reciboMinha.registros);
+
   const abasModalidade = el('div', { class: 'chips', style: 'margin-bottom:.75rem' });
   const areaGrade = el('div');
-  let modalidadeForm = 'presencial';
 
   const desenharGrade = () => {
     abasModalidade.replaceChildren(
@@ -203,7 +238,8 @@ function painelMinha() {
     enviar.disabled = true;
     try {
       await ctx.db.inserirVarios(COL_DISP, registros);
-      raiz.replaceChildren(recibo(n, registros));
+      reciboMinha = { nome: n, registros };
+      pintar();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       enviar.disabled = false;
@@ -261,7 +297,7 @@ function recibo(nome, registros) {
         el('p', { class: 'small muted' },
           'Guarde este resumo se quiser. Por privacidade, esta lista só fica visível para o líder de missão.'),
         el('div', { class: 'row', style: 'margin-top:1rem' },
-          el('button', { class: 'btn btn--ghost btn--sm', type: 'button', onclick: () => pintar() },
+          el('button', { class: 'btn btn--ghost btn--sm', type: 'button', onclick: () => { reciboMinha = null; pintar(); } },
             'Enviar outra disponibilidade'),
         ),
       ),

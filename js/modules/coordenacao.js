@@ -47,6 +47,21 @@ export async function montar(alvo, contexto) {
   pintar();
 }
 
+/**
+ * O que esta tela está mostrando, para o cabeçalho do papel e o nome do PDF.
+ * Lido na hora de imprimir — ver js/impressao.js.
+ */
+export function impressao() {
+  const reuniao = reunioes.find(r => r.id === reuniaoSel);
+  const porAba = {
+    reuniao:     { nome: 'Reunião', detalhe: reuniao ? `Reunião de ${dataLonga(reuniao.data)}` : 'Nenhuma reunião selecionada' },
+    designacoes: { nome: 'Designações', detalhe: `Situação em ${dataLonga(hoje())}` },
+    plano:       { nome: 'Plano da ala', detalhe: 'Plano para compartilhar o evangelho' },
+  };
+  const a = porAba[aba] ?? porAba.reuniao;
+  return { titulo: `Coordenação missionária — ${a.nome}`, detalhe: a.detalhe };
+}
+
 async function recarregar() {
   const [as, rs, ps, ds, pl, pr, cp, cm, cf, al] = await Promise.all([
     ctx.db.listar('areas'),
@@ -176,7 +191,8 @@ function painelReuniao() {
         onchange: (e) => { reuniaoSel = e.target.value; pintar(); } },
         ...reunioes.map(x => el('option', { value: x.id, selected: x.id === r.id }, dataLonga(x.data)))),
       el('span', { class: 'spacer' }),
-      el('button', { class: 'btn btn--ghost btn--sm', type: 'button', onclick: () => imprimirPauta(r, p) }, '🖨 Pauta'),
+      el('button', { class: 'btn btn--ghost btn--sm', type: 'button', onclick: () => imprimirPauta(r, p),
+        title: 'Baixa a pauta como texto, para colar numa mensagem. Para PDF, use Imprimir / PDF.' }, '⬇ Pauta em texto'),
       el('button', { class: 'btn btn--primary btn--sm', type: 'button', onclick: novaReuniao }, '+ Nova'),
     ),
 

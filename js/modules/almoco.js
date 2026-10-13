@@ -20,6 +20,8 @@ let ctx, raiz;
 let aba = 'calendario';
 let ano, mes;
 let areas = [], agenda = [], voluntarios = [];
+/** Busca da lista de voluntários. No módulo, e não no painel, para o papel saber dela. */
+let buscaVol = '';
 let desligarRealtime = null;
 
 export async function montar(alvo, contexto) {
@@ -52,6 +54,26 @@ async function aoMudarRemoto() {
   if (raiz.isConnected) pintar();
 }
 
+/**
+ * O que esta tela está mostrando, para o cabeçalho do papel e o nome do PDF.
+ * Lido na hora de imprimir — ver js/impressao.js.
+ */
+export function impressao() {
+  if (aba === 'voluntarios' && ctx.db.ehAdmin()) {
+    // Lista filtrada pela busca tem que dizer isso no papel: a busca some na
+    // impressão, e seis nomes de dez pareceriam a lista inteira.
+    const q = chave(buscaVol);
+    const vistos = voluntarios.filter(v => !q || chave(v.nome).includes(q)).length;
+    return {
+      titulo: 'Almoço dos missionários — Voluntários',
+      detalhe: q
+        ? `Só os nomes com "${buscaVol.trim()}": ${vistos} de ${voluntarios.length} · ${dataCurta(hoje())}`
+        : `Lista completa, ${voluntarios.length} voluntários · ${dataCurta(hoje())}`,
+    };
+  }
+  return { titulo: 'Almoço dos missionários — Calendário', detalhe: `${MESES[mes]} de ${ano}` };
+}
+
 async function recarregar() {
   const [as, ag, vs] = await Promise.all([
     ctx.db.listar('areas'),
@@ -68,6 +90,10 @@ async function recarregar() {
 --------------------------------------------------------------------------- */
 
 function pintar() {
+  // A aba fica no módulo e sobrevive à troca de papel: quem saiu do acesso de
+  // LMA com Voluntários aberto voltava como membro para um "Acesso restrito",
+  // sem o chip para sair dele — e o papel descrevia a lista de voluntários.
+  if (aba === 'voluntarios' && !ctx.db.ehAdmin()) aba = 'calendario';
   raiz.replaceChildren(
     el('div', { class: 'page-head' },
       el('h2', {}, '🍽️ Almoço dos missionários'),
@@ -259,7 +285,7 @@ async function liberar(reserva, d, area) {
 function painelVoluntarios() {
   if (!ctx.db.ehAdmin()) return vazio('Acesso restrito', 'Esta lista é do LMA.', '🔒');
 
-  const busca = el('input', { class: 'input', type: 'search', placeholder: 'Buscar por nome…', style: 'max-width:16rem' });
+  const busca = el('input', { class: 'input', type: 'search', placeholder: 'Buscar por nome…', style: 'max-width:16rem', value: buscaVol });
   const corpo = el('tbody');
 
   const desenhar = () => {
@@ -284,7 +310,7 @@ function painelVoluntarios() {
             q ? 'Tente outro nome.' : 'Cadastre quem se dispôs a fornecer almoço.', '👥')))]));
   };
 
-  busca.addEventListener('input', desenhar);
+  busca.addEventListener('input', () => { buscaVol = busca.value; desenhar(); });
   desenhar();
 
   return el('div', { class: 'card' },

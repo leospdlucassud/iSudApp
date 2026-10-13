@@ -246,7 +246,7 @@ function painelDuplas() {
     el('div', { class: 'card' },
       el('div', { class: 'card__head' },
         el('span', { class: 'card__title' }, 'Missionários por área'),
-        el('span', { class: 'small muted' }, 'salva ao sair do campo'),
+        el('span', { class: 'small muted nao-imprimir' }, 'salva ao sair do campo'),
       ),
       el('div', { class: 'table-wrap' },
         el('table', { class: 'table' },

@@ -2,6 +2,7 @@
 
 import { CODIGO_POR_EMAIL, INICIO, MODULOS } from './config.js';
 import * as db from './db.js';
+import { botaoImprimir, definirImpressao } from './impressao.js';
 import {
   $, el, modal, toast, confirmar,
   aplicarTema, alternarTema, temaAtual,
@@ -414,6 +415,8 @@ async function montarModulo() {
   if (location.hash.slice(1) !== id) history.replaceState(null, '', `#${id}`);
 
   pintarNav();
+  // Até a tela nova montar, não há o que descrever no papel.
+  definirImpressao(null);
 
   const alvo = $('#conteudo');
   alvo.replaceChildren(carregando());
@@ -450,6 +453,13 @@ async function montarModulo() {
     if (rota.modulo !== id) return;
 
     alvo.replaceChildren();
+
+    // Imprimir / PDF em toda tela que sabe dizer o que está mostrando — o
+    // módulo exporta impressao(). Fica fora do host pelo mesmo motivo do
+    // botão de voltar: o módulo repinta o próprio contêiner.
+    definirImpressao(mod.impressao ? () => mod.impressao() : null);
+    if (mod.impressao) alvo.append(el('div', { class: 'acoes-tela' }, botaoImprimir()));
+
     if (id !== INICIO && !db.ehAdmin()) {
       alvo.append(el('button', {
         class: 'voltar', type: 'button', onclick: () => irPara(INICIO),

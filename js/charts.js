@@ -7,8 +7,9 @@
  *  - grade e eixos em fio de 1px sólido, recessivos;
  *  - texto sempre em tinta, nunca na cor da série — a identidade vem da marca
  *    colorida ao lado;
- *  - legenda sempre presente a partir de duas séries — e clicável: passar
- *    o dedo ou o mouse num item destaca aquela série e apaga as outras;
+ *  - legenda sempre presente a partir de duas séries; com o mouse em cima de
+ *    um item, aquela série se destaca e as outras recuam — só enquanto o
+ *    mouse estiver lá;
  *  - a paleta tem oito cores validadas e nunca se gera uma nona. Série que
  *    precisa repetir cor repete com traço tracejado, e a legenda mostra o
  *    tracejado também;
@@ -80,7 +81,29 @@ function mostrarDica(conteudo, ev) {
   const y = Math.max(8, ev.clientY - r.height - 12);
   dica.style.transform = `translate(${x}px, ${y}px)`;
 }
-const esconderDica = () => { if (dica) dica.style.display = 'none'; };
+/** Fio vertical do gráfico que está mostrando a dica — some junto com ela. */
+let fioAtivo = null;
+
+export const esconderDica = () => {
+  if (dica) dica.style.display = 'none';
+  fioAtivo?.setAttribute('opacity', '0');
+  fioAtivo = null;
+};
+
+// A dica só se esconde no mouseleave da faixa do gráfico — e nó que sai da
+// página não recebe mouseleave. Trocar de tela, abrir a tabela ou redesenhar o
+// gráfico com o mouse em cima deixava a caixinha de valores presa no ar. Ela
+// se recolhe com: movimento fora de um gráfico, troca de rota, e QUALQUER
+// rolagem. Esta última é a do celular: o dedo que arrasta o gráfico fica
+// preso à faixa onde pousou (então o "fora de um gráfico" nunca acontece), e
+// a dica, que é fixa na janela, ficava parada sobre o funil enquanto a página
+// corria por baixo. Em captura, para pegar também a rolagem lateral de dentro
+// do gráfico, que não sobe até a janela.
+addEventListener('pointermove', (e) => {
+  if (dica?.style.display === 'block' && !e.target.closest?.('.viz__svg')) esconderDica();
+}, { passive: true });
+addEventListener('hashchange', esconderDica);
+addEventListener('scroll', esconderDica, { capture: true, passive: true });
 
 const tituloDica = (texto) => el('b', { class: 'viz-dica__titulo' }, texto);
 
@@ -110,20 +133,26 @@ const chaveDica = (serie, valor) =>
  * @param {{nome:string,cor:string,tracejado?:boolean}[]} [o.series]  legenda; a partir de 2 é obrigatória
  * @param {() => Node} [o.tabela]  gêmeo acessível, montado sob demanda
  * @param {Node} [o.acoes]
+ * @param {boolean} [o.tabelaAberta]  começa mostrando a tabela
+ * @param {(aberta: boolean) => void} [o.aoAlternar]  avisa quem redesenha a
+ *   moldura, para ela renascer no mesmo modo — senão cada redesenho voltava
+ *   ao gráfico no meio de quem estava lendo a tabela
  */
-export function moldura({ titulo, descricao, figura, series = [], tabela, acoes }) {
-  const painel = el('div', { class: 'viz__painel' }, figura);
+export function moldura({ titulo, descricao, figura, series = [], tabela, acoes, tabelaAberta = false, aoAlternar }) {
+  let mostrandoTabela = Boolean(tabela && tabelaAberta);
+  const painel = el('div', { class: 'viz__painel' }, mostrandoTabela ? tabela() : figura);
 
-  let mostrandoTabela = false;
   const alternar = tabela && el('button', {
-    class: 'btn btn--ghost btn--sm', type: 'button',
+    class: 'btn btn--ghost btn--sm', type: 'button', 'aria-pressed': String(mostrandoTabela),
     onclick: () => {
       mostrandoTabela = !mostrandoTabela;
+      esconderDica();
       painel.replaceChildren(mostrandoTabela ? tabela() : figura);
       alternar.textContent = mostrandoTabela ? 'Ver gráfico' : 'Ver tabela';
       alternar.setAttribute('aria-pressed', String(mostrandoTabela));
+      aoAlternar?.(mostrandoTabela);
     },
-  }, 'Ver tabela');
+  }, mostrandoTabela ? 'Ver gráfico' : 'Ver tabela');
 
   return el('div', { class: 'card viz' },
     el('div', { class: 'card__head' },
@@ -139,15 +168,20 @@ export function moldura({ titulo, descricao, figura, series = [], tabela, acoes 
 }
 
 /**
- * Legenda que também é controle de destaque.
+ * Legenda com destaque ao passar o mouse.
  *
- * Passar o mouse (ou o foco do teclado) num item acende aquela série e apaga
- * as outras; tocar fixa o destaque, e tocar de novo solta. É a forma de ler
- * um gráfico com muitas linhas sem esconder nenhuma — nada some, o resto só
- * recua. Os valores de todas continuam na dica e na tabela.
+ * Mouse em cima de um item: aquela série acende e as outras recuam. Mouse
+ * fora: tudo volta. Já houve clique para fixar o destaque, e ele confundia —
+ * quem passava o mouse e clicava via o destaque ficar preso depois de tirar o
+ * mouse, sem entender por quê. Os valores de todas as séries continuam na dica
+ * e na tabela, então nada depende do destaque.
  *
- * Só vira botão quando a figura tem marcas com `data-serie`; num gráfico sem
- * isso (ou no aviso de vazio) a legenda segue estática.
+ * Só destaca quando a figura tem marcas com `data-serie`; num gráfico sem
+ * isso (ou no aviso de vazio) a legenda é só legenda.
+ *
+ * Só com mouse (ou caneta). Num toque não existe "tirar o ponteiro de cima":
+ * o celular simulava a entrada e nunca a saída, e o destaque ficava preso até
+ * se tocar em outra coisa. No toque, a dica e as caixas de marcar resolvem.
  */
 function legenda(series, figura) {
   const chave = (x) => el('span', {
@@ -156,37 +190,24 @@ function legenda(series, figura) {
   });
 
   const interativa = !!figura?.querySelector?.('[data-serie]');
-  if (!interativa) {
-    return el('div', { class: 'viz__legenda' },
-      ...series.map(x => el('span', { class: 'viz__item' }, chave(x), x.nome)));
-  }
-
-  let fixado = null;
-  const botoes = [];
   const destacar = (i) => {
     for (const m of figura.querySelectorAll('[data-serie]')) {
       m.classList.toggle('viz__serie--apagada', i != null && m.dataset.serie !== String(i));
     }
   };
-  const soltarPara = () => destacar(fixado);
 
-  series.forEach((x, i) => {
-    botoes.push(el('button', {
-      class: 'viz__item viz__item--botao', type: 'button', 'aria-pressed': 'false',
-      title: `Destacar ${x.nome}`,
-      onmouseenter: () => destacar(i),
-      onmouseleave: soltarPara,
-      onfocus: () => destacar(i),
-      onblur: soltarPara,
-      onclick: () => {
-        fixado = fixado === i ? null : i;
-        botoes.forEach((b, k) => b.setAttribute('aria-pressed', String(k === fixado)));
-        destacar(fixado);
-      },
-    }, chave(x), x.nome));
-  });
+  const seMouse = (fn) => (e) => { if (e.pointerType !== 'touch') fn(); };
 
-  return el('div', { class: 'viz__legenda', role: 'group', 'aria-label': 'Destacar série' }, ...botoes);
+  return el('div', {
+    class: 'viz__legenda',
+    // Rede de segurança: sair da legenda inteira sempre limpa o destaque,
+    // mesmo que algum item perca o próprio pointerleave.
+    onpointerleave: interativa ? seMouse(() => destacar(null)) : null,
+  }, ...series.map((x, i) => el('span', {
+    class: `viz__item${interativa ? ' viz__item--destaca' : ''}`,
+    onpointerenter: interativa ? seMouse(() => destacar(i)) : null,
+    onpointerleave: interativa ? seMouse(() => destacar(null)) : null,
+  }, chave(x), x.nome)));
 }
 
 /**
@@ -286,14 +307,21 @@ function camadaDeFoco({ L, T, pw, ph, x, categorias, series }) {
   });
   g.append(fio);
 
-  const larguraFaixa = pw / Math.max(1, categorias.length);
+  // Cada faixa cobre metade do caminho até o vizinho de cada lado. Era
+  // pw / n, mas os pontos ficam a pw / (n - 1) um do outro: sobrava um vão
+  // sem faixa entre cada par, e com dois pontos só a dica sumia na metade
+  // central inteira do gráfico. As das pontas são cortadas na área do gráfico.
+  const passo = categorias.length > 1 ? pw / (categorias.length - 1) : pw;
   categorias.forEach((c, i) => {
+    const ini = Math.max(L, x(i) - passo / 2);
+    const fim = Math.min(L + pw, x(i) + passo / 2);
     const faixa = s('rect', {
-      x: x(i) - larguraFaixa / 2, y: T, width: larguraFaixa, height: ph,
+      x: ini, y: T, width: Math.max(1, fim - ini), height: ph,
       fill: 'transparent', 'pointer-events': 'all',
     });
     const entrar = (ev) => {
       fio.setAttribute('x1', x(i)); fio.setAttribute('x2', x(i)); fio.setAttribute('opacity', '.6');
+      fioAtivo = fio;
       mostrarDica([tituloDica(c), ...series.map(z => chaveDica(z, n(z.valores[i])))], ev);
     };
     faixa.addEventListener('mousemove', entrar);

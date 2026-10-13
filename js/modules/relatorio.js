@@ -38,9 +38,6 @@ const COL_CAM_FREQ    = 'caminho_frequencia';
 /** Indicadores que o LMA digita. O resto é derivado. */
 const MANUAIS = INDICADORES.filter(i => !i.derivado);
 
-/** Valor do seletor de indicador que pede todos no mesmo gráfico. */
-const TODOS = 'todos';
-
 /**
  * Cor e traço de cada indicador quando ele vira linha ou cartão.
  *
@@ -86,7 +83,15 @@ let aba = 'lancamento';
 let ano = new Date().getFullYear();
 let mes = new Date().getMonth();
 let areaSel = null;
-let indicadorGrafico = 'novas_pessoas';
+/**
+ * Indicadores marcados no gráfico de linhas. Um só: ele vem separado por área,
+ * como sempre foi. Dois ou mais: uma linha por indicador, somada na ala.
+ */
+let indicadoresGrafico = new Set(['novas_pessoas']);
+/** O gráfico de linhas estava em "Ver tabela"? Sobrevive a marcar e desmarcar caixas. */
+let tabelaLinhasAberta = false;
+/** Conta as pinturas da tela; quem grava compara para saber se a tela mudou no meio. */
+let geracao = 0;
 
 let areas = [], semanais = [], frequencias = [], batismos = [], progredindo = [];
 let caminhoPessoas = [], caminhoFrequencia = [];
@@ -97,6 +102,34 @@ export async function montar(alvo, contexto) {
   await recarregar();
   areaSel ??= areas[0]?.id;
   pintar();
+}
+
+/**
+ * O que esta tela está mostrando, para o cabeçalho do papel e o nome do PDF.
+ * Lido na hora de imprimir — ver js/impressao.js.
+ */
+export function impressao() {
+  const periodo = `${MESES[mes]} de ${ano}`;
+  const area = areas.find(a => a.id === areaSel) ?? areas[0];
+  const marcados = INDICADORES.filter(i => indicadoresGrafico.has(i.key));
+  const porAba = {
+    lancamento:  { nome: 'Lançamento', detalhe: area ? `${area.nome} · ${periodo}` : periodo },
+    consolidado: { nome: 'Consolidado', detalhe: `${periodo} · soma das áreas` },
+    graficos:    {
+      nome: 'Gráficos',
+      detalhe: `Cartões e funil: ${periodo} · linhas: domingos de ${ano}`
+        + (marcados.length ? ` · ${marcados.map(i => i.label).join(', ')}` : ''),
+    },
+    batismos:    { nome: 'Batismos', detalhe: `Ano de ${ano}` },
+    progredindo: { nome: 'Progredindo', detalhe: periodo },
+  };
+  const a = porAba[aba] ?? porAba.lancamento;
+  return {
+    titulo: `Relatório de Progresso — ${a.nome}`,
+    detalhe: a.detalhe,
+    // As duas tabelas largas: uma coluna por indicador.
+    paisagem: aba === 'lancamento' || aba === 'consolidado',
+  };
 }
 
 async function recarregar() {
@@ -194,6 +227,7 @@ const ABAS = [
 ];
 
 function pintar() {
+  geracao++;
   const paineis = {
     lancamento:  painelLancamento,
     consolidado: painelConsolidado,
@@ -219,7 +253,7 @@ function pintar() {
 
 /** Seletor de mês, usado por vários painéis. */
 function barraDeMes(extra) {
-  return el('div', { class: 'row row--wrap', style: 'margin-bottom:1rem' },
+  return el('div', { class: 'row row--wrap nao-imprimir', style: 'margin-bottom:1rem' },
     el('button', { class: 'btn btn--ghost btn--sm', type: 'button', 'aria-label': 'Mês anterior',
       onclick: () => { const d = new Date(ano, mes - 1, 1); ano = d.getFullYear(); mes = d.getMonth(); pintar(); } }, '‹'),
     el('strong', { style: 'min-width:9rem;text-align:center' }, `${MESES[mes]} ${ano}`),
@@ -264,7 +298,7 @@ function painelLancamento() {
         el('span', { class: 'card__title' },
           el('span', { class: 'dot', style: `background:${corDaArea(area.cor ?? 0)};margin-right:.5rem` }),
           area.nome),
-        el('span', { class: 'small muted' }, 'salva ao sair do campo'),
+        el('span', { class: 'small muted nao-imprimir' }, 'salva ao sair do campo'),
       ),
       el('div', { class: 'table-wrap' },
         el('table', { class: 'table table--rotulos' }, el('thead', {}, topo), corpo)),
@@ -337,13 +371,37 @@ function campoNumero({ valor: v, rotulo, aoSalvar }) {
 // numa semana ainda inexistente disparavam dois INSERT, e o segundo perdia o
 // valor digitado com erro de unicidade.
 async function salvarSemanal(data, areaId, campo, v) {
+  const g = geracao;
   await ctx.db.gravarNaChave(COL_SEM, { data, area_id: areaId, [campo]: v });
   await recarregar();
+  repintarSeMudou(g);
+}
+
+/**
+ * Repinta depois de uma gravação se a tela foi pintada de novo NO MEIO dela.
+ *
+ * O change do campo dispara no blur — às vezes no mesmo clique que troca de
+ * aba ou de mês —, e a tela nova nasce com os dados de antes da gravação
+ * chegar. Antes a regra era "repinta se saiu do Lançamento", mas o próprio
+ * Lançamento repintado no meio (ir ao próximo mês e voltar) ficava com o
+ * valor antigo. Comparar as pinturas cobre os dois casos e não repinta quando
+ * a pessoa só passou de um campo ao outro, que não pinta nada.
+ *
+ * E não repinta por cima de quem já está digitando em outro campo: perder o
+ * que se digita é pior que ver um número velho, que já está gravado.
+ */
+function repintarSeMudou(g) {
+  if (geracao === g) return;
+  const foco = document.activeElement;
+  if (foco && raiz.contains(foco) && foco.matches('input, textarea, select')) return;
+  pintar();
 }
 
 async function salvarFrequencia(data, v) {
+  const g = geracao;
   await ctx.db.gravarNaChave(COL_FREQ, { data, valor: v });
   await recarregar();
+  repintarSeMudou(g);
 }
 
 /* ---------------------------------------------------------------------------
@@ -440,30 +498,94 @@ function painelGraficos() {
   const mesAnterior = new Date(ano, mes - 1, 1);
   const doMesAnterior = domingosDoMes(mesAnterior.getFullYear(), mesAnterior.getMonth());
 
-  const todos = indicadorGrafico === TODOS;
-  const ind = todos ? null : INDICADORES.find(i => i.key === indicadorGrafico) ?? INDICADORES[0];
-
   // Uma só faixa de filtros acima de tudo que ela controla.
-  const filtros = el('div', { class: 'row row--wrap', style: 'margin-bottom:1rem' },
+  const filtros = el('div', { class: 'row row--wrap nao-imprimir', style: 'margin-bottom:1rem' },
     el('button', { class: 'btn btn--ghost btn--sm', type: 'button', onclick: () => { ano--; pintar(); } }, '‹'),
     el('strong', { style: 'min-width:4rem;text-align:center' }, String(ano)),
     el('button', { class: 'btn btn--ghost btn--sm', type: 'button', onclick: () => { ano++; pintar(); } }, '›'),
     el('span', { class: 'small muted', style: 'margin-left:.75rem' }, 'Mês:'),
     el('select', { class: 'select', style: 'max-width:9rem', onchange: (e) => { mes = Number(e.target.value); pintar(); } },
       ...MESES.map((m, i) => el('option', { value: i, selected: i === mes }, m))),
-    el('span', { class: 'small muted', style: 'margin-left:.75rem' }, 'Indicador:'),
-    el('select', { class: 'select', style: 'max-width:16rem', onchange: (e) => { indicadorGrafico = e.target.value; pintar(); } },
-      el('option', { value: TODOS, selected: todos }, 'Todos os indicadores'),
-      ...INDICADORES.map(i => el('option', { value: i.key, selected: i.key === indicadorGrafico }, i.label))),
   );
+
+  // Marcar ou desmarcar um indicador repinta só o gráfico de linhas. Repintar
+  // o painel inteiro rolaria a página de volta ao topo a cada clique. Os
+  // domingos são recalculados a cada vez: um recarregar() que termine depois
+  // de o painel abrir não pode deixar este gráfico com dado velho.
+  // A classe devolve o espaço que o `.card + .card` dava entre este cartão e
+  // o do funil — com o contêiner no meio, eles deixaram de ser irmãos.
+  const alvoLinhas = el('div', { class: 'grafico-linhas' });
+  const pintarLinhas = () => alvoLinhas.replaceChildren(graficoIndicadores(domingosLancados(ano)));
+  pintarLinhas();
 
   return el('div', {},
     filtros,
     cartoesChave(doMes, doMesAnterior, domingosAno),
-    todos ? graficoTodos(domingosAno) : graficoPorArea(ind, domingosAno),
+    seletorIndicadores(pintarLinhas),
+    alvoLinhas,
     graficoFunil(doMes),
     graficoBatismos(),
   );
+}
+
+/**
+ * Caixas de marcar, uma por indicador, que decidem o que o gráfico de linhas
+ * mostra. Fica logo acima do gráfico que ela controla, e só dele — os
+ * cartões, o funil e os batismos não dependem desta escolha.
+ */
+function seletorIndicadores(aoMudar) {
+  const chave = new Set(INDICADORES_CHAVE.map(i => i.key));
+
+  const caixas = INDICADORES.map(ind => {
+    const caixa = el('input', {
+      type: 'checkbox', checked: indicadoresGrafico.has(ind.key),
+      onchange: (e) => {
+        if (e.target.checked) indicadoresGrafico.add(ind.key);
+        else indicadoresGrafico.delete(ind.key);
+        aoMudar();
+      },
+    });
+    return { ind, caixa };
+  });
+
+  const marcar = (keys) => {
+    indicadoresGrafico = new Set(keys);
+    for (const c of caixas) c.caixa.checked = indicadoresGrafico.has(c.ind.key);
+    aoMudar();
+  };
+  const atalho = (rotulo, keys) =>
+    el('button', { class: 'btn btn--ghost btn--sm', type: 'button', onclick: () => marcar(keys) }, rotulo);
+
+  return el('fieldset', { class: 'card seletor-indicadores nao-imprimir' },
+    el('legend', { class: 'seletor-indicadores__titulo' }, 'Indicadores no gráfico de linhas'),
+    el('div', { class: 'seletor-indicadores__atalhos' },
+      atalho('Indicadores-chave', INDICADORES_CHAVE.map(i => i.key)),
+      atalho('Todos', INDICADORES.map(i => i.key)),
+      atalho('Limpar', []),
+    ),
+    el('div', { class: 'seletor-indicadores__lista' },
+      ...caixas.map(({ ind, caixa }) => el('label', { class: 'seletor-indicadores__item' },
+        caixa,
+        el('span', {}, ind.label),
+        chave.has(ind.key) && el('span', { class: 'tile__selo', title: `Indicador-chave ${ind.pmg} do Pregar Meu Evangelho` }, 'chave'),
+      )),
+    ),
+    el('p', { class: 'field__hint' },
+      'Um indicador só aparece separado por área. Dois ou mais aparecem somados na ala, uma linha por indicador.'),
+  );
+}
+
+/** O gráfico de linhas conforme as caixas marcadas. */
+function graficoIndicadores(domingosAno) {
+  const marcados = INDICADORES.filter(i => indicadoresGrafico.has(i.key));
+  if (!marcados.length) {
+    return moldura({
+      titulo: 'Indicadores',
+      figura: vazio('Nenhum indicador marcado', 'Marque um ou mais indicadores acima para ver o gráfico.', '📈'),
+    });
+  }
+  if (marcados.length === 1) return graficoPorArea(marcados[0], domingosAno);
+  return graficoVarios(marcados, domingosAno);
 }
 
 /**
@@ -513,6 +635,8 @@ function graficoPorArea(ind, domingosAno) {
   }
 
   return moldura({
+    tabelaAberta: tabelaLinhasAberta,
+    aoAlternar: (aberta) => { tabelaLinhasAberta = aberta; },
     titulo: `${ind.label} por área`,
     descricao: `Domingos de ${ano} até hoje. Cada área mantém sua cor em todos os gráficos.`,
     figura: linhas({ categorias: rotulos, series }),
@@ -525,13 +649,14 @@ function graficoPorArea(ind, domingosAno) {
 }
 
 /**
- * Todos os indicadores num gráfico só, total da ala.
+ * Vários indicadores num gráfico só, somados na ala — até os onze.
  *
  * Foi pedido assim, sabendo do custo: as escalas são diferentes — Outras
  * Lições anda na casa das dezenas, Batismos entre zero e dois —, então as
  * linhas pequenas ficam rente ao chão. O que segura a leitura:
  *
- *  - a legenda destaca uma linha e apaga as outras, sem esconder nenhuma;
+ *  - as caixas acima do gráfico tiram o que não interessa no momento;
+ *  - o mouse sobre a legenda destaca uma linha e recua as outras;
  *  - a dica no fio vertical lista os onze valores daquele domingo;
  *  - a tabela traz tudo em número;
  *  - a cor marca a família e o tracejado o parente (ver ESTILO_INDICADOR).
@@ -539,25 +664,31 @@ function graficoPorArea(ind, domingosAno) {
  * Sem rótulo no fim das linhas: onze nomes empilhados na borda direita viram
  * ruído. A legenda faz esse papel.
  */
-function graficoTodos(domingosAno) {
+function graficoVarios(marcados, domingosAno) {
+  const titulo = marcados.length === INDICADORES.length
+    ? 'Todos os indicadores — total da ala'
+    : `${marcados.length} indicadores — total da ala`;
+
   if (!domingosAno.length) {
-    return moldura({ titulo: 'Todos os indicadores', figura: vazio('Sem domingos', `Nada lançado em ${ano}.`, '📈') });
+    return moldura({ titulo, figura: vazio('Sem domingos', `Nada lançado em ${ano}.`, '📈') });
   }
 
-  const series = INDICADORES.map(ind => ({
+  const series = marcados.map(ind => ({
     nome: ind.label,
     ...estiloDo(ind.key),
     valores: domingosAno.map(d => valorAla(d, ind.key)),
   }));
 
   return moldura({
-    titulo: 'Todos os indicadores — total da ala',
-    descricao: `Domingos de ${ano} até hoje. Toque num indicador da legenda para destacar a linha dele.`,
+    tabelaAberta: tabelaLinhasAberta,
+    aoAlternar: (aberta) => { tabelaLinhasAberta = aberta; },
+    titulo,
+    descricao: `Domingos de ${ano} até hoje. Passe o mouse sobre um indicador da legenda para destacar a linha dele.`,
     figura: linhas({ categorias: domingosAno.map(dataCurta), series, altura: 340 }),
     series,
     tabela: () => tabelaSimples(
-      ['Domingo', ...INDICADORES.map(i => i.label)],
-      domingosAno.map(d => [dataCurta(d), ...INDICADORES.map(i => n(valorAla(d, i.key)))]),
+      ['Domingo', ...marcados.map(i => i.label)],
+      domingosAno.map(d => [dataCurta(d), ...marcados.map(i => n(valorAla(d, i.key)))]),
       { rotulosLongos: true },
     ),
   });

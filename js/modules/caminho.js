@@ -52,6 +52,23 @@ export async function montar(alvo, contexto) {
   pintar();
 }
 
+/**
+ * O que esta tela está mostrando, para o cabeçalho do papel e o nome do PDF.
+ * Lido na hora de imprimir — ver js/impressao.js.
+ */
+export function impressao() {
+  const nomes = { acompanhamento: 'Acompanhamento', marcos: 'Marcos', domingos: 'Domingos na igreja' };
+  const tipo = TIPOS_ACOMPANHADO.find(t => t.key === filtroTipo)?.label;
+  const partes = [tipo ?? 'Todos os acompanhados'];
+  if (aba === 'domingos' && ano != null) partes.push(`${MESES[mes]} de ${ano}`);
+  return {
+    titulo: `Caminho do Convênio — ${nomes[aba] ?? nomes.acompanhamento}`,
+    detalhe: partes.join(' · '),
+    // A grade de marcos tem vinte e uma colunas; a de domingos, uma por domingo.
+    paisagem: aba === 'marcos' || aba === 'domingos',
+  };
+}
+
 async function recarregar() {
   const [as, ps, ms, fs] = await Promise.all([
     ctx.db.listar('areas'),
@@ -172,8 +189,10 @@ function linhaPessoa(p) {
   const meses = mesesNoCaminho(p);
 
   return el('tr', {},
+    // `btn--dado`: o texto deste botão é o NOME, não uma ação. A impressão
+    // esconde todo .btn, e sem esta marca a coluna Nome saía vazia no papel.
     el('td', {}, el('button', {
-      class: 'btn btn--ghost btn--sm', type: 'button', style: 'font-weight:600',
+      class: 'btn btn--ghost btn--sm btn--dado', type: 'button', style: 'font-weight:600',
       onclick: () => fichaPessoa(p),
     }, p.nome)),
     el('td', {}, el('span', { class: 'badge badge--mute nowrap' }, `${tipo?.icone ?? ''} ${tipo?.label ?? p.tipo}`)),
@@ -287,7 +306,7 @@ function painelMarcos() {
   return el('div', { class: 'card' },
     el('div', { class: 'card__head' },
       el('span', { class: 'card__title' }, 'Marcos por pessoa'),
-      el('span', { class: 'small muted' }, 'toque para marcar'),
+      el('span', { class: 'small muted nao-imprimir' }, 'toque para marcar'),
     ),
     el('div', { class: 'table-wrap' },
       el('table', { class: 'table table--grade' },
