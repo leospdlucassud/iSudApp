@@ -108,7 +108,7 @@ async function entrarEmPrevia() {
   toast('Modo prévia ativo. Nada aqui está protegido.', 'warn', 5000);
 }
 
-/** Porta principal: usuário e senha, a conta do dono. */
+/** Porta principal: usuário e senha — o dono e quem mais tiver conta criada no painel. */
 async function telaDeSenha() {
   const usuario = el('input', {
     class: 'input', type: 'text', autocomplete: 'username',

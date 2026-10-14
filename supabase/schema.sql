@@ -630,8 +630,10 @@ end $$;
 -- a) RECOMENDADO — conta com senha, criada por você:
 --       Authentication -> Users -> Add user, com "Auto Confirm User" marcado.
 --    Use `nome@isudapp.netlify.app` para ela entrar digitando só `nome`, ou o
---    e-mail real dela. Depois inclua ESSE mesmo endereço na lista pelo app.
---    Não depende de e-mail chegando a lugar nenhum.
+--    e-mail real dela. Depois inclua a mesma conta na lista pelo app — para
+--    `nome@isudapp.netlify.app`, basta digitar `nome`, como no login.
+--    Não depende de e-mail chegando a lugar nenhum. Crie a conta ANTES de
+--    incluir na lista: existindo no Auth, ninguém mais registra o endereço.
 --
 -- b) Por e-mail: a pessoa toca em "Logar como ADM" -> "Receber um link por
 --    e-mail". O primeiro acesso cria a conta no Auth sozinho. Funciona, mas o

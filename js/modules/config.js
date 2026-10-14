@@ -3,9 +3,10 @@
  *
  * Áreas, duplas de missionários do mês, quem tem acesso de líder e os dados.
  *
- * Sobre o acesso: conceder e revogar é privilégio do DONO, a conta que entra
- * com usuário e senha. Um líder que entrou pelo código no e-mail abre as
- * mesmas telas, mas não cria acessos novos — assim uma sessão comprometida
+ * Sobre o acesso: conceder e revogar é privilégio do DONO — a linha com
+ * `dono = true` em `lideres`, não o jeito de entrar: há LMAs comuns com
+ * usuário e senha também. Os demais líderes abrem as mesmas telas, mas não
+ * criam acessos novos — assim uma sessão comprometida
  * não se perpetua sozinha, que era a razão de a lista já ter sido só-leitura.
  * Promover alguém a dono continua sendo uma linha de SQL, de propósito.
  *
@@ -13,7 +14,7 @@
  * os botões daqui só evitam oferecer o que o banco negaria.
  */
 
-import { AREAS_PADRAO, MESES, corDaArea } from '../config.js';
+import { AREAS_PADRAO, CODIGO_POR_EMAIL, DOMINIO_USUARIO, MESES, corDaArea } from '../config.js';
 import { comparaNome, dataCurta, hoje } from '../util.js';
 import { confirmar, el, modal, toast, vazio } from '../ui.js';
 
@@ -350,7 +351,9 @@ function cartaoDoDono() {
         item('Adicionar aqui não manda convite, e a pessoa ainda precisa de um jeito de ' +
              'entrar. O mais firme é criar a conta dela no painel do Supabase, em ' +
              'Authentication → Users → Add user, com "Auto Confirm" marcado: aí ela entra ' +
-             'com usuário e senha, sem depender de e-mail nenhum.'),
+             'com usuário e senha, sem depender de e-mail nenhum. Criando a conta como ' +
+             `usuario@${DOMINIO_USUARIO}, ela digita só o usuário no login — e aqui na ` +
+             'lista basta incluir o mesmo usuário.'),
         item('O outro caminho é ela tocar em "Logar como ADM" → "Receber um link por ' +
              'e-mail". Funciona, mas o link conecta o aparelho que o ABRIR — quem pede no ' +
              'computador e abre no celular fica logado no celular.'),
@@ -373,7 +376,7 @@ function cartaoDeLiderComum() {
     el('div', { class: 'card__body' },
       el('p', { class: 'small muted' },
         'Você abre as mesmas telas que os demais líderes, mas criar e remover acessos ' +
-        'é da conta de dono da ala — a que entra com usuário e senha. Se o app pudesse ' +
+        'é da conta de dono da ala, a marcada como "dono" na lista acima. Se o app pudesse ' +
         'conceder acesso a partir de qualquer sessão, uma sessão comprometida poderia ' +
         'se perpetuar sozinha. Peça a quem administra o app.'),
     ),
@@ -381,28 +384,41 @@ function cartaoDeLiderComum() {
 }
 
 async function formLider() {
-  const email = el('input', { class: 'input', type: 'email', autocomplete: 'off', placeholder: 'pessoa@email.com' });
+  const email = el('input', {
+    class: 'input', type: 'text', autocomplete: 'off',
+    autocapitalize: 'none', autocorrect: 'off', spellcheck: 'false',
+    placeholder: 'pessoa@email.com ou um usuário',
+  });
   const nome  = el('input', { class: 'input', type: 'text', placeholder: 'como você reconhece a pessoa' });
 
   const corpo = el('div', {},
     el('div', { class: 'field' },
-      el('label', {}, 'E-mail'), email,
+      el('label', {}, 'Usuário ou e-mail'), email,
       el('p', { class: 'field__hint' },
-        'Precisa ser o e-mail que a pessoa realmente acessa: é para lá que vai o código de entrada.')),
+        `Usuário (sem @) é para conta com senha: crie a conta antes, no painel do ` +
+        `Supabase, como usuario@${DOMINIO_USUARIO}, e a pessoa entra digitando só o usuário. ` +
+        `E-mail precisa ser um que a pessoa realmente acessa: é para lá que vai o ` +
+        `${CODIGO_POR_EMAIL ? 'código' : 'link'} de entrada.`)),
     el('div', { class: 'field' }, el('label', {}, 'Nome (opcional)'), nome),
   );
 
-  const ok = await modal({
+  // O modal resolve com o retorno de aoConfirmar: o endereço já completado.
+  const liberado = await modal({
     titulo: 'Liberar acesso de LMA',
     corpo,
     confirmar: 'Liberar',
     aoConfirmar: () => ctx.db.adicionarLider(email.value, nome.value),
   });
-  if (!ok) return;
+  if (!liberado) return;
 
   await recarregar();
   pintar();
-  toast('Acesso liberado. Avise a pessoa para entrar com o código do e-mail.', 'ok', 6000);
+  // A lista só autoriza; entrar é outra coisa, e cada tipo de conta tem o seu
+  // passo que falta.
+  toast(liberado.endsWith(`@${DOMINIO_USUARIO}`)
+    ? `Acesso liberado para ${liberado}. A pessoa entra com usuário e senha, desde que a conta exista no painel do Supabase, com "Auto Confirm User".`
+    : `Acesso liberado. Avise a pessoa para entrar pelo ${CODIGO_POR_EMAIL ? 'código' : 'link'} do e-mail.`,
+  'ok', 9000);
 }
 
 async function removerAcesso(l) {

@@ -696,8 +696,10 @@ export async function conferirCodigo(email, codigo) {
 
 export async function adicionarLider(email, nome) {
   exigirSupabase();
-  const e = String(email || '').trim().toLowerCase();
-  if (!/^\S+@\S+\.\S+$/.test(e)) throw new Error('Digite um e-mail válido.');
+  // Mesma regra da tela de login: `ADM` vira `adm@isudapp.netlify.app`. Sem
+  // isso, liberar uma conta com senha exigia digitar aqui o endereço inteiro,
+  // e um "ADM" na lista nunca casaria com o JWT de quem entrou como ADM.
+  const e = usuarioParaEmail(email);
   const { error } = await backend.sb.from('lideres').insert({ email: e, nome: nome?.trim() || null });
   if (error) {
     if (error.code === '23505') throw new Error('Este e-mail já tem acesso.');
