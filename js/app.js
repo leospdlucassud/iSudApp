@@ -391,10 +391,12 @@ async function montarModulo() {
     alvo.replaceChildren();
 
     // Imprimir / PDF em toda tela que sabe dizer o que está mostrando — o
-    // módulo exporta impressao(). Fica fora do host pelo mesmo motivo do
-    // botão de voltar: o módulo repinta o próprio contêiner.
-    definirImpressao(mod.impressao ? () => mod.impressao() : null);
-    if (mod.impressao) alvo.append(el('div', { class: 'acoes-tela' }, botaoImprimir()));
+    // módulo exporta impressao() —, e só para o LMA (pedido do usuário em
+    // outubro de 2026). Fica fora do host pelo mesmo motivo do botão de
+    // voltar: o módulo repinta o próprio contêiner.
+    const imprime = mod.impressao && db.ehAdmin();
+    definirImpressao(imprime ? () => mod.impressao() : null);
+    if (imprime) alvo.append(el('div', { class: 'acoes-tela' }, botaoImprimir()));
 
     if (id !== INICIO && !db.ehAdmin()) {
       alvo.append(el('button', {
