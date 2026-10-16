@@ -367,6 +367,9 @@ a { color: var(--primary); }
 .nav__lock { font-size: .75rem; opacity: .6; }
 
 .nav[hidden] { display: none; }
+/* O atributo `hidden` perde para qualquer `display` de classe — o botão da
+   conta (inline-flex) continuava na tela de entrada mesmo escondido. */
+[hidden] { display: none !important; }
 
 .main { padding: 1rem; max-width: 78rem; margin: 0 auto; }
 
@@ -450,15 +453,6 @@ a { color: var(--primary); }
   vertical-align: .1em;
 }
 
-/* Chamada de login, no rodapé da tela inicial. */
-.login-cta {
-  margin-top: 1.25rem;
-  padding: 1.125rem;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--r-lg);
-  text-align: center;
-}
-.login-cta__msg { font-size: .8125rem; color: var(--text-2); margin-bottom: .75rem; }
 
 /* ==========================================================================
    Blocos
@@ -513,14 +507,16 @@ a { color: var(--primary); }
 .btn--icon { padding: .375rem; width: 2rem; height: 2rem; }
 .btn--bloco { display: flex; width: 100%; }
 
-/* Divisória "ou" entre os dois caminhos de login. */
-.ou {
-  display: flex; align-items: center; gap: .625rem;
-  margin: .25rem 0 .875rem;
-  color: var(--text-3);
-  font-size: .6875rem; letter-spacing: .1em; text-transform: uppercase;
+/* Botão com cara de link: "Esqueci minha senha", "Já tenho cadastro". */
+.btn-link {
+  display: block;
+  margin: .75rem auto 0;
+  padding: .375rem .5rem;
+  color: var(--primary);
+  font-size: .8125rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
-.ou::before, .ou::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
 /* ==========================================================================
    Formulários
@@ -535,6 +531,40 @@ a { color: var(--primary); }
   margin-bottom: .3125rem;
 }
 .field__hint { font-size: .75rem; color: var(--text-3); margin-top: .25rem; }
+
+/* Caixa de marcar com o texto ao lado — "Este número tem WhatsApp". */
+.check {
+  display: flex; align-items: center; gap: .5rem;
+  margin: -.25rem 0 .875rem;
+  font-size: .875rem;
+  cursor: pointer;
+}
+.check input { width: 1.0625rem; height: 1.0625rem; flex: 0 0 auto; accent-color: var(--primary); }
+
+/* Erro de formulário, logo acima do botão que o causou. */
+.form__erro { color: var(--danger); font-size: .8125rem; font-weight: 500; margin: -.125rem 0 .75rem; }
+.form__erro:empty { display: none; }
+
+/* Telas de antes do app — entrar, cadastrar, trocar senha. Coluna estreita
+   no centro: um formulário de 78rem de largura cansa a leitura. */
+.entrada { max-width: 30rem; margin: 0 auto; }
+.entrada__atalhos { border-style: dashed; }
+
+/* O nome do cadastro no lugar do campo de nome, nas reservas do membro. */
+.reserva__quem { font-weight: 600; font-size: .9375rem; }
+
+/* A senha provisória, para ditar ou copiar. */
+.senha-provisoria {
+  padding: .5rem .75rem;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  font-family: var(--font-num);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-align: center;
+  user-select: all;
+}
 
 .input, .select, .textarea {
   width: 100%;

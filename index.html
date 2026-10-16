@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Obra Missionária — Ala Palmas 4</title>
-<meta name="description" content="Ferramentas para o líder de missão da ala: relatório de progresso, calendário de almoço, disponibilidade para lições e acompanhamento no caminho do convênio.">
+<meta name="description" content="Ferramenta do membro para o apoio à Obra Missionária da Ala Palmas 4: calendário de almoço com os missionários e disponibilidade para lições.">
 <meta name="theme-color" content="#f2ece0">
 <meta name="robots" content="noindex, nofollow">
 <link rel="manifest" href="/manifest.json">
@@ -29,6 +29,7 @@
 <link rel="modulepreload" href="/js/ui.js">
 <link rel="modulepreload" href="/js/util.js">
 <link rel="modulepreload" href="/js/impressao.js">
+<link rel="modulepreload" href="/js/entrada.js">
 <link rel="modulepreload" href="/js/modules/inicio.js">
 <script>
   // Antes da primeira pintura, para não piscar branco no tema escuro.
@@ -69,14 +70,17 @@
   </svg>
 
   <p class="hdr__church">A Igreja de Jesus Cristo dos Santos dos Últimos Dias</p>
-  <!-- Espelha ALA.igreja e ALA.titulo em js/config.js: estático aqui só para a primeira pintura. -->
+  <!--
+    Espelha ALA.igreja, ALA.titulo e ALA.subtituloMembro em js/config.js:
+    estático aqui só para a primeira pintura. O subtítulo do LMA entra pelo
+    JavaScript, depois que a sessão diz quem é.
+  -->
   <h1 class="hdr__title">Obra Missionária da Ala Palmas 4</h1>
-  <p class="hdr__sub">Ferramentas para o LMA</p>
-
-  <button class="hdr__role" id="btn-papel" type="button">
-    <span id="papel-icone">👥</span><span id="papel-texto">Membro</span>
+  <p class="hdr__sub">Ferramenta do membro para o apoio à Obra Missionária</p>
+  <!-- O nome de quem entrou; abre o menu da conta. Some sem sessão. -->
+  <button class="hdr__role" id="btn-papel" type="button" hidden>
+    <span id="papel-icone">👤</span><span id="papel-texto"></span>
   </button>
-
   <div class="hdr__tools">
     <button class="hdr__btn" id="btn-tema" type="button"></button>
     <button class="hdr__btn" id="btn-fonte-menos" type="button" aria-label="Diminuir a letra">A-</button>

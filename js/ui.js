@@ -192,8 +192,12 @@ export function modal({ titulo, corpo, confirmar = 'Salvar', cancelar = 'Cancela
     // ordem de documento e o botão de fechar, que vive no cabeçalho, vinha
     // antes — quem apertava Enter achando que confirmava descartava o
     // formulário.
+    //
+    // Visível: o "Trocar senha" leva um campo de usuário escondido (para o
+    // gerenciador de senhas saber de quem é a senha nova), e o foco ia parar
+    // nele — ou seja, em lugar nenhum.
     setTimeout(() => {
-      const alvo = $('.modal__body input, .modal__body select, .modal__body textarea', box)
+      const alvo = $(':is(input, select, textarea):not([hidden]):not([type=hidden])', $('.modal__body', box))
         || btnOk || btnCancel || btnFechar;
       alvo?.focus();
     }, 60);

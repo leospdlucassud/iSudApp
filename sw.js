@@ -6,7 +6,7 @@
  * pior do que erro de conexão.
  */
 
-const CACHE = 'om-v9';
+const CACHE = 'om-v10';
 
 const CASCA = [
   '/',
@@ -20,6 +20,7 @@ const CASCA = [
   '/js/ui.js',
   '/js/util.js',
   '/js/impressao.js',
+  '/js/entrada.js',
   '/js/vendor/supabase.js',
   '/js/modules/inicio.js',
   // Para ?demo abrir mesmo num celular sem sinal: sem ele em cache, a

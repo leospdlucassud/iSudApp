@@ -18,46 +18,28 @@
 export const ALA = {
   nome: 'Ala Palmas 4',
   titulo: 'Obra Missionária da Ala Palmas 4',
+  /** Subtítulo de quem entrou como LMA ou ADM. */
   subtitulo: 'Ferramentas para o LMA',
+  /** Subtítulo de todos os outros — e da tela de entrada, antes do login. */
+  subtituloMembro: 'Ferramenta do membro para o apoio à Obra Missionária',
   igreja: 'A Igreja de Jesus Cristo dos Santos dos Últimos Dias',
 };
 
 /**
- * Domínio que completa um nome de usuário no login com senha.
+ * Domínio que completa um nome de usuário no login.
  *
  * O Supabase Auth não conhece "usuário": a identidade é sempre um e-mail. Para
- * o dono poder entrar digitando só `LeoADM`, o app completa o que vier sem "@"
- * com este domínio, e a conta é criada no painel do Supabase já com o endereço
- * inteiro (`leoadm@isudapp.netlify.app`).
+ * o líder entrar digitando só `LMA` ou `ADM`, o app completa o que vier sem
+ * "@" com este domínio, e as contas são criadas no painel do Supabase já com o
+ * endereço inteiro (`lma@isudapp.netlify.app`, `adm@isudapp.netlify.app`).
  *
  * É o domínio do próprio app de propósito: ninguém recebe e-mail nele, e
- * assim nenhuma caixa de terceiro é usada como identidade emprestada. Como
- * esse endereço não existe de verdade, "esqueci a senha" por e-mail não
- * funciona para a conta de dono — trocar a senha é no painel do Supabase.
+ * assim nenhuma caixa de terceiro é usada como identidade emprestada. O
+ * cadastro de membro recusa endereços daqui, no app e no banco.
  *
- * Mudar este valor invalida os logins por usuário já criados.
+ * Mudar este valor invalida os logins de líder já criados.
  */
 export const DOMINIO_USUARIO = 'isudapp.netlify.app';
-
-/**
- * O e-mail de acesso traz um código de 6 dígitos, ou só o link?
- *
- * O código só existe se o template "Magic link or OTP" contiver {{ .Token }},
- * e o Supabase no plano free NÃO deixa editar template nenhum enquanto o
- * projeto usar o servidor de e-mail embutido: a tela mostra "Set up custom
- * SMTP to edit templates" e os campos ficam travados. O padrão manda só o
- * link.
- *
- * Enquanto isto for `false`, o app não pede código que nunca vai chegar: ele
- * avisa que mandou um link e que o link precisa ser aberto NESTE aparelho.
- *
- * Vire para `true` depois de ligar um SMTP próprio (Resend, Brevo e afins têm
- * plano gratuito) e acrescentar {{ .Token }} ao template. Aí o e-mail traz o
- * código, e quem pede no computador entra no computador.
- *
- * O login do dono não depende disto: usuário e senha não passam por e-mail.
- */
-export const CODIGO_POR_EMAIL = false;
 
 /* ---------------------------------------------------------------------------
    Áreas e duplas
@@ -375,7 +357,7 @@ export const MODULOS = [
   {
     id: 'config', label: 'Configurações', icone: '⚙️', admin: true,
     titulo: 'Configurações',
-    descricao: 'Áreas, duplas de missionários, acessos e exportação.',
+    descricao: 'Áreas, duplas de missionários, membros cadastrados e exportação.',
   },
 ];
 

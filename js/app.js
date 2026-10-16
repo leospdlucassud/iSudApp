@@ -1,16 +1,21 @@
 /** Casca do aplicativo: cabeçalho, navegação, rotas e carregamento dos módulos. */
 
-import { CODIGO_POR_EMAIL, INICIO, MODULOS } from './config.js';
+import { ALA, INICIO, MODULOS } from './config.js';
 import * as db from './db.js';
+import { menuDaConta, telaDeCompletarCadastro, telaDeEntrada, telaDeTrocarSenha } from './entrada.js';
 import { botaoImprimir, definirImpressao } from './impressao.js';
 import {
-  $, el, modal, toast, confirmar,
+  $, el, modal, toast, confirmar, fecharModal,
   aplicarTema, alternarTema, temaAtual,
   aplicarFonte, ajustarFonte,
   carregando, vazio,
 } from './ui.js';
 
-const rota = { modulo: null };
+/**
+ * `portao`: a tela é uma das de antes do app (entrar, trocar senha, completar
+ * cadastro). Quando a sessão muda ali, a pessoa segue para o início.
+ */
+const rota = { modulo: null, portao: false };
 
 /* ---------------------------------------------------------------------------
    Cabeçalho
@@ -23,14 +28,20 @@ function pintarTema() {
   b.setAttribute('aria-label', escuro ? 'Mudar para o tema claro' : 'Mudar para o tema escuro');
 }
 
-function pintarPapel() {
+/**
+ * O nome da pessoa no topo, que abre o menu da conta, e o subtítulo do papel.
+ * Sem sessão o botão some: não há "logar como LMA" — o líder entra pela
+ * mesma tela de todo mundo.
+ */
+function pintarConta() {
   const admin = db.ehAdmin();
-  $('#papel-icone').textContent = admin ? '🔑' : '👥';
-  $('#papel-texto').textContent = admin ? 'LMA' : 'Membro';
-  $('#btn-papel').setAttribute(
-    'aria-label',
-    admin ? 'Você está como líder de missão da ala. Toque para sair.' : 'Entrar como líder de missão da ala',
-  );
+  const nome = db.nomeNaSessao() || (admin ? 'LMA' : 'Conta');
+  const b = $('#btn-papel');
+  b.hidden = !db.sessaoAtiva();
+  $('#papel-icone').textContent = admin ? '🔑' : '👤';
+  $('#papel-texto').textContent = nome;
+  b.setAttribute('aria-label', `Sua conta: ${nome}. Trocar senha ou sair.`);
+  $('.hdr__sub').textContent = admin ? ALA.subtitulo : ALA.subtituloMembro;
 }
 
 function ligarCabecalho() {
@@ -49,183 +60,51 @@ function ligarCabecalho() {
   $('#btn-fonte-mais').addEventListener('click', () => fonte(+1));
   fonte(0);
 
-  $('#btn-papel').addEventListener('click', () => (db.ehAdmin() ? sairDoAdmin() : entrarComoAdmin()));
-  pintarPapel();
+  $('#btn-papel').addEventListener('click', menuDaConta);
 }
 
 /* ---------------------------------------------------------------------------
-   Entrada e saída do líder
+   Sessão
 
-   Duas portas, e as duas terminam numa sessão de verdade do Supabase — a
-   restrição real de acesso mora nas policies do banco, que leem o e-mail do
-   token. Não existe login "só no JavaScript" aqui: seria decoração num arquivo
-   que qualquer pessoa baixa, e o banco negaria tudo do mesmo jeito.
-
-     1. Usuário e senha — a conta do dono, e de quem mais receber conta
-        criada no painel do Supabase. A sessão nasce neste aparelho.
-     2. E-mail — para quem só tem o e-mail liberado na lista de líderes.
-
-   A porta do e-mail entrega código de 6 dígitos ou link conforme
-   CODIGO_POR_EMAIL, em js/config.js. A diferença importa: a sessão do link
-   nasce em quem ABRE o link, e era isso que fazia quem pedia no computador
-   acabar logado no celular. O código não tem esse problema, mas depende de um
-   template de e-mail que o plano free do Supabase não deixa editar sem SMTP
-   próprio — por isso a constante, e por isso o app avisa em vez de pedir um
-   código que não vai chegar.
-
-   Enquanto o Supabase não está configurado, o modo prévia libera as telas
-   restritas só neste aparelho, sem qualquer garantia — e diz isso com todas
-   as letras.
+   Ninguém usa o app sem entrar (js/entrada.js). O membro entra com o e-mail
+   e a senha do cadastro; o líder, com o usuário LMA ou ADM no mesmo campo.
+   As duas portas terminam numa sessão de verdade do Supabase, e a restrição
+   real mora nas policies do banco: um login "só no JavaScript" seria
+   decoração num arquivo que qualquer pessoa baixa.
 --------------------------------------------------------------------------- */
 
-async function entrarComoAdmin() {
-  if (db.ehAdmin()) return;
-  // Na demonstração não há o que validar: o botão só alterna a visão, para o
-  // apresentador mostrar o app pelos dois lados.
-  if (db.emDemonstracao()) {
-    db.entrarEmPrevia();
-    await aoMudarDePapel();
-    toast('Visão do líder de missão da ala.', 'ok');
-    return;
-  }
-  if (!db.temBackend()) return entrarEmPrevia();
-  await telaDeSenha();
-}
-
-async function entrarEmPrevia() {
-  const corpo = el('div', {},
-    el('p', { class: 'muted', style: 'margin-bottom:.75rem' },
-      'O acesso de líder é validado pelo banco de dados, que ainda não foi conectado.'),
-    el('p', { class: 'small muted' },
-      'Você pode abrir as telas restritas em modo prévia para conferir o layout. ' +
-      'Nesse modo nada é protegido e os dados ficam só neste aparelho.'),
-  );
-  const ok = await modal({ titulo: 'Acesso do LMA', corpo, confirmar: 'Abrir em modo prévia' });
-  if (ok !== true) return;
-
-  db.entrarEmPrevia();
-  await aoMudarDePapel();
-  toast('Modo prévia ativo. Nada aqui está protegido.', 'warn', 5000);
-}
-
-/** Porta principal: usuário e senha — o dono e quem mais tiver conta criada no painel. */
-async function telaDeSenha() {
-  const usuario = el('input', {
-    class: 'input', type: 'text', autocomplete: 'username',
-    autocapitalize: 'none', autocorrect: 'off', spellcheck: 'false',
-    placeholder: 'usuário ou e-mail',
-  });
-  const senha = el('input', {
-    class: 'input', type: 'password', autocomplete: 'current-password', placeholder: 'senha',
-  });
-
-  const corpo = el('div', {},
-    el('div', { class: 'field' }, el('label', {}, 'Usuário ou e-mail'), usuario),
-    el('div', { class: 'field' }, el('label', {}, 'Senha'), senha),
-    el('div', { class: 'ou' }, el('span', {}, 'ou')),
-    el('button', {
-      class: 'btn btn--ghost btn--bloco', type: 'button',
-      onclick: () => telaDePedirCodigo(usuario.value),
-    }, CODIGO_POR_EMAIL ? '✉️ Receber um código por e-mail' : '✉️ Receber um link por e-mail'),
-    el('p', { class: 'field__hint', style: 'margin-top:.5rem' },
-      'Para quem o dono liberou pelo e-mail e não tem senha.'),
-  );
-
-  await modal({
-    titulo: '🔑 Logar como ADM',
-    corpo,
-    confirmar: 'Entrar',
-    aoConfirmar: () => db.entrarComSenha(usuario.value, senha.value),
-  });
-}
-
-/** Pede o e-mail e devolve o endereço para o passo seguinte. */
-async function telaDePedirCodigo(sugestao = '') {
-  const inicial = String(sugestao || '').includes('@') ? String(sugestao).trim() : '';
-  const email = el('input', {
-    class: 'input', type: 'email', autocomplete: 'email',
-    value: inicial, placeholder: 'seu e-mail',
-  });
-
-  const corpo = el('div', {},
-    el('div', { class: 'field' },
-      el('label', {}, 'E-mail'), email,
-      el('p', { class: 'field__hint' },
-        'Precisa ser um e-mail que já tenha acesso liberado. ' + (CODIGO_POR_EMAIL
-          ? 'Você recebe um código de 6 dígitos para digitar aqui mesmo.'
-          : 'Você recebe um link de acesso para abrir neste mesmo aparelho.'))),
-  );
-
-  const alvo = await modal({
-    titulo: CODIGO_POR_EMAIL ? '✉️ Entrar com código' : '✉️ Entrar por e-mail',
-    corpo,
-    confirmar: CODIGO_POR_EMAIL ? 'Enviar código' : 'Enviar link',
-    aoConfirmar: async () => {
-      const v = email.value.trim().toLowerCase();
-      await db.pedirCodigo(v);
-      return v;
-    },
-  });
-
-  // O modal resolve com o e-mail, e o encadeamento acontece aqui fora, não
-  // dentro do `aoConfirmar`: abrir um modal enquanto o anterior ainda está
-  // fechando faria o fechamento do antigo apagar o registro do novo.
-  if (typeof alvo !== 'string') return;
-  if (CODIGO_POR_EMAIL) await telaDeConferirCodigo(alvo);
-  else await telaDeLinkEnviado(alvo);
-}
-
 /**
- * Sem {{ .Token }} no template, o e-mail sai só com o link. Pedir um código
- * aqui seria mandar a pessoa esperar por algo que não vem — este aviso troca
- * o beco sem saída pela única instrução que resolve: abrir o link AQUI.
+ * Eventos que não mudam quem está na tela. SESSAO_RENOVADA é o SIGNED_IN que
+ * o supabase-js repete, com a mesma pessoa, sempre que a aba volta a ficar
+ * visível — o db.js o renomeia para ele não passar por login.
  */
-async function telaDeLinkEnviado(email) {
-  const corpo = el('div', {},
-    el('p', { class: 'muted', style: 'margin-bottom:.75rem' },
-      'Enviamos um link de acesso para ', el('strong', {}, email), '.'),
-    el('p', { class: 'small' },
-      'Abra o e-mail neste mesmo aparelho e toque no link. Quem entra é o ' +
-      'aparelho que ABRE o link: se você pedir no computador e abrir no ' +
-      'celular, quem fica logado é o celular.'),
-  );
+const EVENTOS_SILENCIOSOS = new Set(['TOKEN_REFRESHED', 'USER_UPDATED', 'INITIAL_SESSION', 'SESSAO_RENOVADA']);
 
-  await modal({ titulo: '✉️ Link enviado', corpo, confirmar: 'Entendi', cancelar: null });
-}
+async function aoMudarSessao(evento) {
+  if (EVENTOS_SILENCIOSOS.has(evento)) return;
+  // Trocou a pessoa (outra aba saiu e entrou com outra conta): um "Meu
+  // cadastro" ou "Trocar senha" aberto aqui gravaria na conta NOVA o que a
+  // anterior digitou.
+  if (['SIGNED_IN', 'SIGNED_OUT', 'CADASTRADO'].includes(evento)) fecharModal();
+  pintarConta();
 
-async function telaDeConferirCodigo(email) {
-  const codigo = el('input', {
-    class: 'input input--num', type: 'text', inputmode: 'numeric',
-    autocomplete: 'one-time-code', maxlength: '6', placeholder: '000000',
-  });
+  // Editar "Meu cadastro" troca o nome nos calendários: remonta a tela atual,
+  // sem tirar a pessoa de onde ela está.
+  if (evento === 'CADASTRO' && !rota.portao) return montarModulo();
+  // Trocar a senha pelo menu não muda nada na tela.
+  if (evento === 'SENHA' && !rota.portao) return;
 
-  const corpo = el('div', {},
-    el('p', { class: 'muted', style: 'margin-bottom:.875rem' },
-      'Enviamos um código de 6 dígitos para ', el('strong', {}, email), '.'),
-    el('div', { class: 'field' },
-      el('label', {}, 'Código'), codigo,
-      el('p', { class: 'field__hint' },
-        'Digite o código aqui, neste mesmo aparelho — é o que garante que você ' +
-        'entre onde começou. O link do mesmo e-mail também funciona, mas loga ' +
-        'no aparelho em que for aberto.')),
-    el('button', {
-      class: 'btn btn--ghost btn--bloco', type: 'button',
-      onclick: () => telaDePedirCodigo(email),
-    }, 'Reenviar ou trocar o e-mail'),
-  );
+  if (location.hash.slice(1) === INICIO) await montarModulo();
+  else irPara(INICIO);
 
-  await modal({
-    titulo: '✉️ Código de acesso',
-    corpo,
-    confirmar: 'Entrar',
-    aoConfirmar: () => db.conferirCodigo(email, codigo.value),
-  });
-}
-
-async function sairDoAdmin() {
-  await db.sair();
-  await aoMudarDePapel();
-  toast(db.emDemonstracao() ? 'Visão de membro da ala.' : 'Você saiu do acesso de líder.');
+  // Boas-vindas só quando o app abre de fato — não por cima de "não foi
+  // possível carregar o seu cadastro" nem da conta de líder sem vínculo,
+  // onde saía um "Olá, !" sem nome.
+  const entrouNoApp = !db.precisaTrocarSenha() && !db.faltaCadastro()
+    && !db.falhaDeSessao() && !db.liderSemVinculo();
+  if (evento === 'SIGNED_IN' && entrouNoApp) {
+    toast(db.ehAdmin() ? 'Você entrou como líder de missão da ala.' : `Olá, ${db.nomeNaSessao()}!`, 'ok');
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -275,13 +154,6 @@ function pintarFaixaDeDemonstracao() {
   ));
 }
 
-/** Repinta tudo e volta à tela inicial, que muda de conteúdo conforme o papel. */
-async function aoMudarDePapel() {
-  pintarPapel();
-  if (location.hash.slice(1) === INICIO) await montarModulo();
-  else irPara(INICIO);
-}
-
 /* ---------------------------------------------------------------------------
    Navegação
 
@@ -293,7 +165,7 @@ const modulosVisiveis = () => (db.ehAdmin() ? MODULOS : MODULOS.filter(m => !m.a
 
 function pintarNav() {
   const nav = $('#nav');
-  const admin = db.ehAdmin();
+  const admin = db.ehAdmin() && !rota.portao;
 
   nav.hidden = !admin;
   if (!admin) return nav.replaceChildren();
@@ -387,21 +259,70 @@ function telaSemConfiguracao() {
   );
 }
 
-/** Banco conectado, tabelas ainda não criadas. */
+/** Banco conectado, tabelas desta versão ainda não criadas. */
 function telaDeInstalacao() {
   return el('div', {},
     el('div', { class: 'page-head' },
-      el('h2', {}, '🗄️ Falta criar as tabelas'),
-      el('p', {}, 'O app já está conectado ao Supabase, mas o banco está vazio.'),
+      el('h2', {}, '🗄️ O banco precisa ser atualizado'),
+      el('p', {}, 'O app está conectado ao Supabase, mas faltam as tabelas desta versão.'),
     ),
     el('div', { class: 'card' }, el('div', { class: 'card__body' },
+      el('p', { class: 'muted', style: 'margin-bottom:.75rem' },
+        'Se você é membro da ala, avise o líder de missão — o app volta assim que ele rodar a atualização.'),
       el('ol', { style: 'padding-left:1.25rem;display:grid;gap:.625rem' },
         el('li', {}, 'Abra o painel do Supabase e vá em ', el('strong', {}, 'SQL Editor'), '.'),
         el('li', {}, 'Cole o conteúdo de ', el('code', {}, 'supabase/schema.sql'), ' e rode.'),
-        el('li', {}, 'No fim do arquivo, descomente as últimas linhas com o seu e-mail e rode de novo — ',
-          'sem estar na tabela ', el('code', {}, 'lideres'), ', ninguém abre as telas restritas.'),
+        el('li', {}, 'Siga o "último passo", no fim do arquivo, na ordem em que está escrito: ',
+          'as contas LMA e ADM primeiro, os blocos A e B, e só então o cadastro sem confirmação de e-mail.'),
         el('li', {}, 'Recarregue esta página.'),
       ),
+    )),
+  );
+}
+
+/**
+ * Conta de líder (lma@, adm@...) criada no painel do Supabase mas ainda fora
+ * da lista de líderes. Sem esta tela, ela caía em "complete seu cadastro" de
+ * membro, que o banco recusa nesse domínio com um erro em inglês.
+ */
+function telaLiderSemVinculo() {
+  const email = db.emailDaSessao() ?? '';
+  // Não basta mandar rodar o bloco B: ele só liga conta que NUNCA entrou (é
+  // a proteção contra quem registra o endereço antes do dono), e quem vê esta
+  // tela acabou de entrar. Mandar rodar de novo era um laço sem fim.
+  return el('div', { class: 'entrada' },
+    el('div', { class: 'page-head' },
+      el('h2', {}, '🔑 Esta conta não está na lista de líderes'),
+      el('p', {}, 'Você entrou como ', el('strong', {}, email), '.'),
+    ),
+    el('div', { class: 'card' }, el('div', { class: 'card__body' },
+      el('p', { class: 'small', style: 'margin-bottom:.75rem' },
+        'A senha está certa, mas a conta não abre as telas do LMA. Desde outubro de 2026, o LeoADM ' +
+        'e os acessos liberados por e-mail não entram mais.'),
+      el('p', { class: 'small', style: 'margin-bottom:1rem' },
+        'Se esta conta deve ser de líder: no Supabase, em Authentication → Users, apague-a e crie de ' +
+        'novo com "Auto Confirm User"; rode o bloco B do fim de supabase/schema.sql ANTES de entrar ' +
+        'com ela — o bloco só liga conta que nunca entrou.'),
+      el('button', { class: 'btn btn--ghost', type: 'button', onclick: () => db.sair() }, 'Sair'),
+    )),
+  );
+}
+
+/** Tem sessão, mas a rede falhou ao perguntar quem é a pessoa. */
+function telaFalhaDeSessao() {
+  addEventListener('online', () => location.reload(), { once: true });
+  return el('div', { class: 'entrada' },
+    el('div', { class: 'page-head' },
+      el('h2', {}, '📡 Não foi possível carregar o seu cadastro'),
+      el('p', {}, 'Geralmente é a internet. Seus dados continuam lá.'),
+    ),
+    el('div', { class: 'card' }, el('div', { class: 'card__body' },
+      el('div', { class: 'row row--wrap' },
+        el('button', { class: 'btn btn--primary', type: 'button', onclick: () => location.reload() },
+          'Tentar de novo'),
+        el('button', { class: 'btn btn--ghost', type: 'button', onclick: () => db.sair() }, 'Sair'),
+      ),
+      el('p', { class: 'small muted', style: 'margin-top:1rem' }, db.falhaDeSessao()),
     )),
   );
 }
@@ -413,6 +334,16 @@ async function montarModulo() {
   // Rota inválida ou sem permissão: alinha a URL ao que está na tela.
   // replaceState não dispara hashchange, então não recursiona.
   if (location.hash.slice(1) !== id) history.replaceState(null, '', `#${id}`);
+
+  // Antes do app: sem sessão, senha provisória, cadastro incompleto, ou sem
+  // saber quem é a pessoa. Nada disso tem barra de módulos nem o que imprimir.
+  const bloqueio = !db.sessaoAtiva() ? telaDeEntrada
+    : db.falhaDeSessao() ? (a) => a.replaceChildren(telaFalhaDeSessao())
+    : db.precisaTrocarSenha() ? telaDeTrocarSenha
+    : db.liderSemVinculo() ? (a) => a.replaceChildren(telaLiderSemVinculo())
+    : db.faltaCadastro() ? telaDeCompletarCadastro
+    : null;
+  rota.portao = Boolean(bloqueio);
 
   pintarNav();
   // Até a tela nova montar, não há o que descrever no papel.
@@ -436,6 +367,11 @@ async function montarModulo() {
     return;
   }
 
+  if (bloqueio) {
+    bloqueio(alvo);
+    return;
+  }
+
   try {
     const mod = await import(`./modules/${id}.js`);
     // Uma rota mais nova pode ter começado enquanto o import resolvia.
@@ -449,7 +385,7 @@ async function montarModulo() {
     // instante, então a faixa ficava em branco justamente durante a parte
     // lenta: as consultas que o módulo faz ao banco dentro de montar().
     const host = el('div');
-    await mod.montar(host, { db, irPara, entrarComoAdmin });
+    await mod.montar(host, { db, irPara });
     if (rota.modulo !== id) return;
 
     alvo.replaceChildren();
@@ -490,25 +426,10 @@ async function iniciar() {
   // ficava em branco.
   await db.iniciar();
   if (db.emDemonstracao()) pintarFaixaDeDemonstracao();
-  pintarPapel();
+  pintarConta();
 
-  // A sessão resolve depois do primeiro render — seja restaurada do
-  // armazenamento, seja recém-criada pelo login. Quando resolve, o papel muda
-  // e a tela precisa acompanhar.
-  db.aoMudarSessao(async (evento) => {
-    // Renovação silenciosa de token não muda papel nenhum e não deve repintar.
-    if (evento === 'TOKEN_REFRESHED' || evento === 'USER_UPDATED') return;
-
-    await aoMudarDePapel();
-
-    if (db.sessaoSemPermissao()) {
-      toast('Este e-mail não está na lista de líderes da ala.', 'warn', 7000);
-    } else if (evento === 'SIGNED_IN' && db.ehAdmin()) {
-      // Só no login de verdade: em INITIAL_SESSION este aviso reapareceria a
-      // cada recarga de página para quem já está logado.
-      toast('Você entrou como líder de missão da ala.', 'ok');
-    }
-  });
+  // Entrar, sair, cadastrar, trocar a senha provisória: a tela acompanha.
+  db.aoMudarSessao(aoMudarSessao);
 
   addEventListener('hashchange', montarModulo);
   await montarModulo();

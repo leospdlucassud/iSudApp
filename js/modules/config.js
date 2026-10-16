@@ -1,24 +1,30 @@
 /**
  * Configurações — só o LMA.
  *
- * Áreas, duplas de missionários do mês, quem tem acesso de líder e os dados.
+ * Áreas, duplas de missionários do mês, membros cadastrados e os dados.
  *
- * Sobre o acesso: conceder e revogar é privilégio do DONO — a linha com
- * `dono = true` em `lideres`, não o jeito de entrar: há LMAs comuns com
- * usuário e senha também. Os demais líderes abrem as mesmas telas, mas não
- * criam acessos novos — assim uma sessão comprometida
- * não se perpetua sozinha, que era a razão de a lista já ter sido só-leitura.
- * Promover alguém a dono continua sendo uma linha de SQL, de propósito.
+ * Sobre o acesso, desde outubro de 2026: cada membro se cadastra sozinho na
+ * tela de entrada, e líder é só quem está na tabela `lideres` — as contas LMA
+ * e ADM, ligadas por SQL. O app não concede nem tira acesso de ninguém; o que
+ * ele faz aqui é mostrar os cadastros ao LMA e gerar senha provisória para
+ * quem esqueceu a sua.
  *
- * Quem recusa de verdade são as policies de `lideres`, que exigem eh_dono();
- * os botões daqui só evitam oferecer o que o banco negaria.
+ * Quem recusa de verdade são as policies do banco; os botões daqui só evitam
+ * oferecer o que ele negaria.
  */
 
-import { AREAS_PADRAO, CODIGO_POR_EMAIL, DOMINIO_USUARIO, MESES, corDaArea } from '../config.js';
-import { comparaNome, dataCurta, hoje } from '../util.js';
+import { AREAS_PADRAO, MESES, corDaArea } from '../config.js';
+import { chave, comparaNome, dataCurta, hoje } from '../util.js';
 import { confirmar, el, modal, toast, vazio } from '../ui.js';
 
-/** Coleções incluídas no backup, na ordem em que devem ser restauradas. */
+/**
+ * Coleções restauradas de um backup, na ordem em que devem entrar.
+ *
+ * `membros` não volta na restauração: cada linha é presa a uma conta do
+ * Supabase Auth, e restaurar sem a conta falharia — noutro projeto, cada
+ * membro se cadastra de novo. Mas o backup a LEVA (ver SO_NO_BACKUP), para o
+ * LMA não perder os contatos se o projeto se perder.
+ */
 const COLECOES = [
   'areas', 'duplas_missionarios',
   'voluntarios_almoco', 'almoco_agenda',
@@ -29,11 +35,16 @@ const COLECOES = [
   'plano_ala',
 ];
 
+/** Vão no arquivo, para consulta, mas não são restauradas. */
+const SO_NO_BACKUP = ['membros'];
+
 let ctx, raiz;
 let aba = 'areas';
 let ano = new Date().getFullYear();
 let mes = new Date().getMonth();
-let areas = [], duplas = [], lideres = [];
+let areas = [], duplas = [], membros = [];
+/** Busca da lista de membros. No módulo, para sobreviver às repinturas. */
+let buscaMembro = '';
 
 export async function montar(alvo, contexto) {
   ctx = contexto;
@@ -52,14 +63,14 @@ async function recarregar() {
   const [as, ds, ls] = await Promise.all([
     ctx.db.listar('areas'),
     ctx.db.listar('duplas_missionarios'),
-    ctx.db.listar('lideres').catch(() => []),
+    ctx.db.listar('membros').catch(() => []),
   ]);
   // Aqui, ao contrário dos outros módulos, mostramos o que está GRAVADO.
   // Exibir AREAS_PADRAO como se existisse faria as áreas "sumirem" no
   // instante em que a primeira área real fosse criada.
   areas = [...as].sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
   duplas = ds;
-  lideres = ls;
+  membros = ls;
 }
 
 /* ---------------------------------------------------------------------------
@@ -69,17 +80,17 @@ async function recarregar() {
 const ABAS = [
   { id: 'areas',  rotulo: '🗺️ Áreas' },
   { id: 'duplas', rotulo: '👔 Duplas' },
-  { id: 'acesso', rotulo: '🔑 Acesso' },
+  { id: 'membros', rotulo: '👥 Membros' },
   { id: 'dados',  rotulo: '💾 Dados' },
 ];
 
 function pintar() {
-  const paineis = { areas: painelAreas, duplas: painelDuplas, acesso: painelAcesso, dados: painelDados };
+  const paineis = { areas: painelAreas, duplas: painelDuplas, membros: painelMembros, dados: painelDados };
 
   raiz.replaceChildren(
     el('div', { class: 'page-head' },
       el('h2', {}, '⚙️ Configurações'),
-      el('p', {}, 'Áreas da ala, duplas do mês, acesso e cópia de segurança.'),
+      el('p', {}, 'Áreas da ala, duplas do mês, membros cadastrados e cópia de segurança.'),
     ),
     el('div', { class: 'chips', style: 'margin-bottom:1rem' },
       ...ABAS.map(a => el('button', {
@@ -291,153 +302,134 @@ async function copiarMesAnterior() {
 }
 
 /* ---------------------------------------------------------------------------
-   Acesso
+   Membros cadastrados
 --------------------------------------------------------------------------- */
 
-function painelAcesso() {
-  const dono = ctx.db.souDono();
-  const meu = String(ctx.db.emailDaSessao() || '').toLowerCase();
-  const linhas = [...lideres].sort((a, b) => comparaNome(a.email, b.email));
+/** Link do WhatsApp: com DDD, o 55 do Brasil vai na frente. */
+function linkWhatsApp(telefone) {
+  const d = String(telefone || '').replace(/\D/g, '');
+  if (d.length < 10) return null;
+  return `https://wa.me/${d.length <= 11 ? `55${d}` : d}`;
+}
+
+function painelMembros() {
+  const busca = el('input', {
+    class: 'input', type: 'search', placeholder: 'Buscar por nome ou e-mail…',
+    style: 'max-width:18rem', value: buscaMembro, 'aria-label': 'Buscar membro',
+  });
+  const corpo = el('tbody');
+  const contagem = el('span', { class: 'small muted' });
+
+  // Só o corpo da tabela repinta ao digitar: repintar o painel inteiro
+  // recriaria o campo de busca e tiraria o foco dele a cada letra.
+  const desenhar = () => {
+    const q = chave(busca.value);
+    const lista = membros
+      .filter(m => !q || chave(`${m.nome_completo} ${m.apelido} ${m.email}`).includes(q))
+      .sort((a, b) => comparaNome(a.nome_completo, b.nome_completo));
+    contagem.textContent = q ? `${lista.length} de ${membros.length}` : `${membros.length} cadastrado(s)`;
+
+    corpo.replaceChildren(...(lista.length ? lista.map(m => {
+      const zap = m.whatsapp && linkWhatsApp(m.telefone);
+      return el('tr', {},
+        el('td', {},
+          el('strong', {}, m.nome_completo),
+          el('div', { class: 'small muted' }, `chamado de ${m.apelido}`)),
+        el('td', { class: 'small' }, m.email),
+        el('td', { class: 'small nowrap' },
+          m.telefone,
+          zap && el('div', {}, el('a', { href: zap, target: '_blank', rel: 'noopener' }, '💬 WhatsApp'))),
+        el('td', { class: 'small muted nowrap' }, m.criado_em ? dataCurta(m.criado_em.slice(0, 10)) : '—'),
+        el('td', {}, el('button', {
+          class: 'btn btn--ghost btn--sm nowrap', type: 'button',
+          'aria-label': `Gerar senha provisória para ${m.nome_completo}`,
+          onclick: () => senhaProvisoria(m),
+        }, '🔑 Senha provisória')),
+      );
+    }) : [el('tr', {}, el('td', { colspan: 5 },
+      vazio(q ? 'Ninguém encontrado' : 'Ninguém cadastrado ainda',
+            q ? 'Tente outro nome ou e-mail.' : 'Os membros se cadastram na tela de entrada do app.', '👥')))]));
+  };
+  busca.addEventListener('input', () => { buscaMembro = busca.value; desenhar(); });
+  desenhar();
 
   return el('div', {},
     el('div', { class: 'card' },
       el('div', { class: 'card__head' },
-        el('span', { class: 'card__title' }, `${lideres.length} pessoa(s) com acesso de LMA`),
-        dono && el('button', {
-          class: 'btn btn--primary btn--sm', type: 'button', onclick: formLider,
-        }, '+ Acesso'),
+        el('span', { class: 'card__title' }, 'Membros cadastrados'),
+        contagem,
       ),
-      linhas.length
-        ? el('div', { class: 'table-wrap' },
-            el('table', { class: 'table' },
-              el('thead', {}, el('tr', {},
-                el('th', {}, 'E-mail'), el('th', {}, 'Nome'), el('th', {}, 'Desde'),
-                dono && el('th', {}, ''),
-              )),
-              el('tbody', {}, ...linhas.map(l => el('tr', {},
-                el('td', {},
-                  el('strong', {}, l.email),
-                  l.dono && el('span', { class: 'badge badge--ok', style: 'margin-left:.4375rem' }, 'dono'),
-                  l.email?.toLowerCase() === meu
-                    && el('span', { class: 'badge badge--mute', style: 'margin-left:.4375rem' }, 'você'),
-                ),
-                el('td', {}, l.nome ?? '—'),
-                el('td', { class: 'small muted' }, l.criado_em ? dataCurta(l.criado_em.slice(0, 10)) : '—'),
-                // O dono não aparece com botão de remover: a policy recusaria,
-                // e oferecer um botão que só sabe dar erro é pior do que não ter.
-                dono && el('td', {}, !l.dono && el('button', {
-                  class: 'btn btn--icon btn--ghost', type: 'button',
-                  'aria-label': `Remover o acesso de ${l.email}`,
-                  onclick: () => removerAcesso(l),
-                }, '🗑️')),
-              ))),
-            ))
-        : vazio('Lista vazia ou sem leitura',
-            'Se você entrou como líder e não vê ninguém aqui, a conexão pode estar em modo local.', '🔑'),
+      el('div', { class: 'card__body', style: 'padding-bottom:0' }, busca),
+      el('div', { class: 'table-wrap' },
+        el('table', { class: 'table' },
+          el('thead', {}, el('tr', {},
+            el('th', {}, 'Nome'), el('th', {}, 'E-mail'), el('th', {}, 'Telefone'),
+            el('th', {}, 'Desde'), el('th', {}, ''),
+          )),
+          corpo,
+        )),
     ),
-
-    dono ? cartaoDoDono() : cartaoDeLiderComum(),
-  );
-}
-
-function cartaoDoDono() {
-  const item = (texto) => el('li', { class: 'small' }, texto);
-
-  return el('div', { class: 'card' },
-    el('div', { class: 'card__head' }, el('span', { class: 'card__title' }, 'Como o acesso funciona')),
-    el('div', { class: 'card__body' },
-      el('ul', { style: 'padding-left:1.125rem;display:grid;gap:.5rem;margin-bottom:1rem' },
-        item('Quem entra nesta lista abre exatamente as mesmas telas que você.'),
-        item('Adicionar aqui não manda convite, e a pessoa ainda precisa de um jeito de ' +
-             'entrar. O mais firme é criar a conta dela no painel do Supabase, em ' +
-             'Authentication → Users → Add user, com "Auto Confirm" marcado: aí ela entra ' +
-             'com usuário e senha, sem depender de e-mail nenhum. Criando a conta como ' +
-             `usuario@${DOMINIO_USUARIO}, ela digita só o usuário no login — e aqui na ` +
-             'lista basta incluir o mesmo usuário.'),
-        item('O outro caminho é ela tocar em "Logar como ADM" → "Receber um link por ' +
-             'e-mail". Funciona, mas o link conecta o aparelho que o ABRIR — quem pede no ' +
-             'computador e abre no celular fica logado no celular.'),
-        item('Ninguém além de você concede acesso, seja como entrar. Só a conta de dono.'),
-        item('Tirar o acesso é imediato: sem a linha na lista, a sessão que a pessoa ' +
-             'ainda tenha aberta deixa de abrir qualquer tela restrita.'),
+    el('div', { class: 'card' },
+      el('div', { class: 'card__head' }, el('span', { class: 'card__title' }, 'Como o acesso funciona')),
+      el('div', { class: 'card__body' },
+        el('ul', { style: 'padding-left:1.125rem;display:grid;gap:.5rem' },
+          el('li', { class: 'small' },
+            'Cada membro se cadastra sozinho na tela de entrada, com nome completo, como quer ser ' +
+            'chamado, e-mail, telefone e uma senha. Sem cadastro, ninguém vê nada do app.'),
+          el('li', { class: 'small' },
+            'Quem esquecer a senha: gere uma provisória aqui e passe para a pessoa. Ela entra com ' +
+            'a provisória e o app pede uma nova na mesma hora.'),
+          el('li', { class: 'small' },
+            'Entram como líder só as contas LMA e ADM. Líder novo é uma linha de SQL no Supabase — ' +
+            'de propósito, o app não promove ninguém. O passo a passo está no fim do supabase/schema.sql.'),
+        ),
       ),
-      el('p', { class: 'small muted', style: 'margin-bottom:.5rem' },
-        'Passar a condição de dono para outra conta continua sendo uma linha de SQL, ' +
-        'de propósito — o app não promove ninguém:'),
-      el('pre', { class: 'codigo' },
-        "update public.lideres set dono = true where email = 'pessoa@email.com';"),
     ),
   );
 }
 
-function cartaoDeLiderComum() {
-  return el('div', { class: 'card' },
-    el('div', { class: 'card__head' }, el('span', { class: 'card__title' }, 'Conceder acesso é do dono')),
-    el('div', { class: 'card__body' },
-      el('p', { class: 'small muted' },
-        'Você abre as mesmas telas que os demais líderes, mas criar e remover acessos ' +
-        'é da conta de dono da ala, a marcada como "dono" na lista acima. Se o app pudesse ' +
-        'conceder acesso a partir de qualquer sessão, uma sessão comprometida poderia ' +
-        'se perpetuar sozinha. Peça a quem administra o app.'),
-    ),
-  );
+/** 8 caracteres sem os que se confundem lidos em voz alta ou à mão (l, 1, i, o, 0). */
+function gerarSenha() {
+  const letras = 'abcdefghjkmnpqrstuvwxyz23456789';
+  const sorteio = crypto.getRandomValues(new Uint32Array(8));
+  return [...sorteio].map(n => letras[n % letras.length]).join('');
 }
 
-async function formLider() {
-  const email = el('input', {
-    class: 'input', type: 'text', autocomplete: 'off',
-    autocapitalize: 'none', autocorrect: 'off', spellcheck: 'false',
-    placeholder: 'pessoa@email.com ou um usuário',
-  });
-  const nome  = el('input', { class: 'input', type: 'text', placeholder: 'como você reconhece a pessoa' });
-
-  const corpo = el('div', {},
-    el('div', { class: 'field' },
-      el('label', {}, 'Usuário ou e-mail'), email,
-      el('p', { class: 'field__hint' },
-        `Usuário (sem @) é para conta com senha: crie a conta antes, no painel do ` +
-        `Supabase, como usuario@${DOMINIO_USUARIO}, e a pessoa entra digitando só o usuário. ` +
-        `E-mail precisa ser um que a pessoa realmente acessa: é para lá que vai o ` +
-        `${CODIGO_POR_EMAIL ? 'código' : 'link'} de entrada.`)),
-    el('div', { class: 'field' }, el('label', {}, 'Nome (opcional)'), nome),
-  );
-
-  // O modal resolve com o retorno de aoConfirmar: o endereço já completado.
-  const liberado = await modal({
-    titulo: 'Liberar acesso de LMA',
-    corpo,
-    confirmar: 'Liberar',
-    aoConfirmar: () => ctx.db.adicionarLider(email.value, nome.value),
-  });
-  if (!liberado) return;
-
-  await recarregar();
-  pintar();
-  // A lista só autoriza; entrar é outra coisa, e cada tipo de conta tem o seu
-  // passo que falta.
-  toast(liberado.endsWith(`@${DOMINIO_USUARIO}`)
-    ? `Acesso liberado para ${liberado}. A pessoa entra com usuário e senha, desde que a conta exista no painel do Supabase, com "Auto Confirm User".`
-    : `Acesso liberado. Avise a pessoa para entrar pelo ${CODIGO_POR_EMAIL ? 'código' : 'link'} do e-mail.`,
-  'ok', 9000);
-}
-
-async function removerAcesso(l) {
+async function senhaProvisoria(m) {
   const ok = await confirmar(
-    'Tirar o acesso?',
-    `${l.email} deixa de abrir relatório, caminho do convênio, coordenação e configurações. ` +
-    'Nada do que já foi lançado é apagado.',
-    { confirmar: 'Tirar o acesso' },
+    'Gerar senha provisória?',
+    `A senha atual de ${m.nome_completo} deixa de funcionar. Você passa a provisória para ` +
+    'a pessoa, e o app pede uma senha nova assim que ela entrar.',
+    { confirmar: 'Gerar', tom: 'primary' },
   );
   if (!ok) return;
 
+  const senha = gerarSenha();
   try {
-    await ctx.db.removerLider(l.email);
+    await ctx.db.redefinirSenhaDeMembro(m.id, senha);
   } catch (err) {
-    return toast(err?.message || 'Não foi possível remover.', 'err');
+    return toast(err?.message || 'Não foi possível gerar a senha.', 'err');
   }
-  await recarregar();
-  pintar();
-  toast('Acesso removido.', 'ok');
+
+  await modal({
+    titulo: 'Senha provisória',
+    corpo: el('div', {},
+      el('p', { class: 'muted', style: 'margin-bottom:.5rem' }, `Passe para ${m.apelido}:`),
+      el('p', { class: 'senha-provisoria' }, senha),
+      el('button', {
+        class: 'btn btn--ghost btn--sm', type: 'button', style: 'margin:.25rem 0 .875rem',
+        onclick: () => navigator.clipboard?.writeText(senha)
+          .then(() => toast('Senha copiada.', 'ok'), () => toast('Não deu para copiar. Anote a senha.', 'warn')),
+      }, '📋 Copiar'),
+      el('p', { class: 'small muted' },
+        `A pessoa entra com o e-mail ${m.email} e esta senha. Esta janela é a única vez ` +
+        'que a senha aparece — se perder, gere outra.'),
+      ctx.db.emDemonstracao() && el('p', { class: 'small muted', style: 'margin-top:.5rem' },
+        'Na demonstração nenhuma senha é conferida; aqui só se vê como funciona.'),
+    ),
+    confirmar: 'Pronto',
+    cancelar: null,
+  });
 }
 
 /* ---------------------------------------------------------------------------
@@ -455,6 +447,10 @@ function painelDados() {
           'Baixa tudo num arquivo JSON. Vale fazer de vez em quando: projetos Supabase no plano ' +
           'gratuito são pausados após um período sem uso, e o backup é o que garante que os dados ' +
           'da ala não dependem disso.'),
+        el('p', { class: 'small muted', style: 'margin-bottom:.75rem' },
+          'O cadastro de membros vai no arquivo para consulta — nomes, e-mails e telefones —, mas ' +
+          'não volta numa restauração: ele é preso às contas de cada um, e num projeto novo cada ' +
+          'membro se cadastra de novo. Guarde o arquivo com cuidado.'),
         el('div', { class: 'row row--wrap' },
           el('button', { class: 'btn btn--primary btn--sm', type: 'button', onclick: () => exportarTudo(resultado) }, '⬇ Baixar backup'),
           el('button', { class: 'btn btn--ghost btn--sm', type: 'button', onclick: () => restaurar(resultado) }, '⬆ Restaurar de um backup'),
@@ -470,7 +466,7 @@ async function exportarTudo(saida) {
   const backup = { versao: 1, gerado_em: new Date().toISOString(), dados: {} };
   const falhas = [];
 
-  for (const c of COLECOES) {
+  for (const c of [...COLECOES, ...SO_NO_BACKUP]) {
     try { backup.dados[c] = await ctx.db.listar(c); }
     catch (err) { falhas.push(`${c}: ${err.message}`); }
   }
@@ -482,7 +478,7 @@ async function exportarTudo(saida) {
   URL.revokeObjectURL(url);
 
   saida.replaceChildren(
-    el('p', { class: 'small' }, `${total} registro(s) em ${COLECOES.length - falhas.length} coleção(ões).`),
+    el('p', { class: 'small' }, `${total} registro(s) em ${COLECOES.length + SO_NO_BACKUP.length - falhas.length} coleção(ões).`),
     ...falhas.map(f => el('p', { class: 'small', style: 'color:var(--danger)' }, f)),
   );
   toast('Backup gerado.', 'ok');
@@ -499,7 +495,7 @@ async function restaurar(saida) {
       el('p', { class: 'small muted', style: 'margin-bottom:.75rem' },
         'Restaurar o mesmo backup duas vezes é seguro: cada registro guarda seu ' +
         'identificador original, então o que já está no banco é pulado em vez de duplicado. ' +
-        'O resumo diz quantos entraram e quantos foram pulados.'),
+        'O resumo diz quantos entraram, quantos já existiam e quantos deram erro.'),
       el('div', { class: 'field' }, el('label', {}, 'Arquivo'), arquivo),
     ),
     confirmar: 'Restaurar',
@@ -517,19 +513,53 @@ async function restaurar(saida) {
     return;
   }
 
+  // Reservas e disponibilidades feitas por membro levam o membro_id, que
+  // aponta para `membros` — e o cadastro não volta numa restauração. Num
+  // projeto novo, toda linha dessas batia na chave estrangeira e sumia,
+  // contada como "pulada". Sem o cadastro, ela entra sem o vínculo: o nome
+  // continua na linha, e é o nome que a grade mostra.
+  let cadastrados;
+  try {
+    cadastrados = new Set((await ctx.db.listar('membros')).map(m => m.id));
+  } catch (err) {
+    // Sem a lista, cada vínculo seria desfeito à toa — inclusive o de quem
+    // tem cadastro. Melhor não restaurar nada agora.
+    saida.replaceChildren(el('p', { style: 'color:var(--danger)' },
+      `Não foi possível ler os cadastros para restaurar: ${err?.message || err}. Tente de novo.`));
+    return;
+  }
+
   const resumo = [];
   for (const c of COLECOES) {
     const linhas = backup.dados[c];
     if (!Array.isArray(linhas) || !linhas.length) continue;
-    let gravados = 0, pulados = 0;
-    for (const linha of linhas) {
+    let gravados = 0, existiam = 0, desligados = 0;
+    const falhas = [];
+    for (const original of linhas) {
+      const semVinculo = Boolean(original.membro_id) && !cadastrados.has(original.membro_id);
+      const linha = semVinculo ? { ...original, membro_id: null } : original;
       // Preserva o `id` de propósito: ele é a chave primária, então restaurar
       // o mesmo backup duas vezes pula tudo em vez de duplicar. Descartá-lo
       // faria o banco gerar um id novo e nada colidiria.
-      try { await ctx.db.inserir(c, linha); gravados++; }
-      catch { pulados++; }
+      try {
+        await ctx.db.inserir(c, linha);
+        gravados++;
+        if (semVinculo) desligados++;
+      }
+      catch (err) {
+        // Só o conflito de chave é "já estava no banco". Qualquer outro erro
+        // é falha, e aparece como falha — contado como "pulado", ele passava
+        // por duplicata.
+        if (err?.name === 'ConflitoError') existiam++;
+        else falhas.push(err?.message || 'erro desconhecido');
+      }
     }
-    resumo.push(`${c}: ${gravados} gravado(s)${pulados ? `, ${pulados} pulado(s)` : ''}`);
+    resumo.push([
+      `${c}: ${gravados} gravado(s)`,
+      existiam && `${existiam} já existia(m)`,
+      desligados && `${desligados} sem o vínculo com o cadastro do membro`,
+      falhas.length && `${falhas.length} com erro (${[...new Set(falhas)].slice(0, 2).join('; ')})`,
+    ].filter(Boolean).join(', '));
   }
 
   // Sem pintar() aqui: ele recria o painel e o resumo iria parar num elemento

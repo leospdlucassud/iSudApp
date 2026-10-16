@@ -7,15 +7,23 @@
 --
 -- Duas garantias vivem aqui, e não no JavaScript:
 --   1. Dois membros não conseguem pegar a mesma vaga — constraint UNIQUE.
---   2. As telas do LMA são restritas de verdade — policies de RLS.
+--   2. Quem não tem cadastro não vê nada, e as telas do LMA são restritas de
+--      verdade — policies de RLS.
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
 -- Quem é líder
 --
--- Qualquer pessoa consegue pedir um código (ou link) para o próprio e-mail e
--- obter uma sessão. Ter sessão, portanto, NÃO é ser líder. A autorização vem
--- desta lista — sem estar aqui, a sessão não abre nada.
+-- Desde outubro de 2026 são duas contas, LMA e ADM, criadas à mão no painel do
+-- Supabase (ver o fim deste arquivo). Qualquer pessoa pode se cadastrar como
+-- membro e ganhar uma sessão, então ter sessão NÃO é ser líder: quem autoriza
+-- é esta lista, e o app não escreve nela. Líder novo é uma linha de SQL.
+--
+-- A lista aponta para a CONTA (usuario_id), não para o e-mail. Com o cadastro
+-- aberto e sem confirmação de e-mail, quem registrasse lma@isudapp.netlify.app
+-- antes de a conta de verdade existir herdaria o acesso se a chave fosse o
+-- e-mail. Pela conta, o intruso fica só com um login sem poder nenhum — e o
+-- "Add user" do painel falha avisando que o endereço já existe.
 -- -----------------------------------------------------------------------------
 
 create table if not exists public.lideres (
@@ -24,15 +32,11 @@ create table if not exists public.lideres (
   criado_em  timestamptz not null default now()
 );
 
--- O dono é o único que concede e revoga acesso pelo próprio app. Todos os
--- outros líderes abrem as mesmas telas, mas não criam líderes novos: assim uma
--- sessão comprometida não se perpetua sozinha, que era a razão de a lista ser
--- só-leitura antes.
-alter table public.lideres add column if not exists dono boolean not null default false;
+alter table public.lideres
+  add column if not exists usuario_id uuid unique references auth.users(id) on delete cascade;
 
--- O e-mail entra sempre em minúsculas. A chave primária diferencia maiúsculas
--- e eh_lider() não: sem isto, 'Fulano@x.com' e 'fulano@x.com' virariam duas
--- linhas para a mesma pessoa. `not valid` deixa as linhas já gravadas em paz.
+-- O e-mail entra sempre em minúsculas. `not valid` deixa as linhas já
+-- gravadas em paz.
 do $$
 begin
   if not exists (select 1 from pg_constraint where conname = 'lideres_email_minusculo') then
@@ -42,7 +46,7 @@ begin
 end $$;
 
 comment on table public.lideres is
-  'Lista de e-mails autorizados como LMA. Ter sessão não basta: é preciso estar aqui.';
+  'Contas com acesso de LMA. Autoriza pela conta (usuario_id); o e-mail é só para leitura humana.';
 
 -- security definer para que a função enxergue a tabela mesmo quando o
 -- solicitante não tem permissão de leitura sobre ela.
@@ -55,31 +59,140 @@ set search_path = public
 as $$
   select exists (
     select 1 from public.lideres
-    where lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+    where usuario_id = auth.uid()
   );
 $$;
 
 revoke all on function public.eh_lider() from public;
 grant execute on function public.eh_lider() to anon, authenticated;
 
--- Quem é o dono. Mesma mecânica de eh_lider(), usada pelas policies de
--- escrita da tabela `lideres` e pela tela de Acesso.
-create or replace function public.eh_dono()
+-- -----------------------------------------------------------------------------
+-- Membros cadastrados
+--
+-- Todo membro que oferece almoço, acompanha lições ou usa o app tem cadastro.
+-- Uma linha por conta do Supabase Auth — o id É o da conta. A linha nasce do
+-- próprio app, logo depois do signUp, com a sessão que ele devolve.
+--
+-- Tem e-mail e telefone, então só o dono da linha e o LMA leem.
+-- -----------------------------------------------------------------------------
+
+create table if not exists public.membros (
+  id             uuid primary key default auth.uid() references auth.users(id) on delete cascade,
+  nome_completo  text not null check (char_length(nome_completo) between 3 and 120),
+  apelido        text not null check (char_length(apelido) between 2 and 40 and apelido = btrim(apelido)),
+  email          text not null unique check (email = lower(email)),
+  telefone       text not null check (char_length(regexp_replace(telefone, '\D', '', 'g')) between 10 and 13),
+  whatsapp       boolean not null default true,
+  criado_em      timestamptz not null default now(),
+  atualizado_em  timestamptz not null default now()
+);
+
+-- O domínio do app é das contas de líder. Um membro com endereço ali só
+-- serviria para confundir quem lê a lista — ou para se passar por uma delas.
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'membros_email_pessoal') then
+    alter table public.membros
+      add constraint membros_email_pessoal check (email !~ '@isudapp\.netlify\.app$');
+  end if;
+end $$;
+
+comment on table public.membros is
+  'Cadastro de cada membro que usa o app. Só o próprio membro e o LMA leem.';
+
+create or replace function public.eh_membro()
 returns boolean
 language sql
 stable
 security definer
 set search_path = public
 as $$
-  select exists (
-    select 1 from public.lideres
-    where lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))
-      and dono
-  );
+  select exists (select 1 from public.membros where id = auth.uid());
 $$;
 
-revoke all on function public.eh_dono() from public;
-grant execute on function public.eh_dono() to anon, authenticated;
+-- Quem pode abrir o app: líder ou membro com cadastro. Sessão sem cadastro
+-- (o signUp que não chegou a gravar a linha) ainda não vê nada.
+create or replace function public.pode_usar()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.eh_lider() or public.eh_membro();
+$$;
+
+-- O nome que vai para os calendários. As policies exigem que a reserva de um
+-- membro leve ESTE nome e o id da conta dele. O nome sozinho não prova nada
+-- — o membro pode trocar o próprio "como quer ser chamado" —, por isso o app
+-- mostra ao LMA, pelo membro_id, de qual cadastro cada reserva saiu.
+create or replace function public.apelido_do_membro()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select apelido from public.membros where id = auth.uid();
+$$;
+
+revoke all on function public.eh_membro() from public;
+revoke all on function public.pode_usar() from public;
+revoke all on function public.apelido_do_membro() from public;
+grant execute on function public.eh_membro() to anon, authenticated;
+grant execute on function public.pode_usar() to anon, authenticated;
+grant execute on function public.apelido_do_membro() to anon, authenticated;
+
+-- -----------------------------------------------------------------------------
+-- Senha provisória
+--
+-- Uma linha aqui obriga a conta a trocar de senha no próximo login: a senha
+-- inicial do LMA, e a que o LMA gera para o membro que esqueceu a sua. O
+-- e-mail embutido do Supabase não entrega recuperação de senha, então este é
+-- o caminho de volta para quem ficou do lado de fora.
+-- -----------------------------------------------------------------------------
+
+create table if not exists public.senhas_provisorias (
+  id         uuid primary key references auth.users(id) on delete cascade,
+  criado_em  timestamptz not null default now()
+);
+
+
+-- O LMA dá ao membro uma senha provisória. Mexe em auth.users, por isso é
+-- security definer e confere tudo antes: só líder chama, só sobre conta de
+-- membro, nunca sobre conta de líder — senha de líder se troca no painel.
+create or replace function public.redefinir_senha_de_membro(p_membro uuid, p_senha text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.eh_lider() then
+    raise exception 'Só o líder de missão gera senha provisória.' using errcode = '42501';
+  end if;
+  if char_length(coalesce(p_senha, '')) < 8 then
+    raise exception 'A senha provisória precisa de pelo menos 8 caracteres.' using errcode = '22023';
+  end if;
+  if not exists (select 1 from public.membros where id = p_membro) then
+    raise exception 'Cadastro não encontrado.' using errcode = 'P0002';
+  end if;
+  if exists (select 1 from public.lideres where usuario_id = p_membro) then
+    raise exception 'Senha de líder se troca pelo SQL do fim do schema.sql.' using errcode = '42501';
+  end if;
+
+  update auth.users
+     set encrypted_password = extensions.crypt(p_senha, extensions.gen_salt('bf', 10)),
+         updated_at = now()
+   where id = p_membro;
+
+  insert into public.senhas_provisorias (id) values (p_membro)
+  on conflict (id) do update set criado_em = now();
+end;
+$$;
+
+revoke all on function public.redefinir_senha_de_membro(uuid, text) from public, anon;
+grant execute on function public.redefinir_senha_de_membro(uuid, text) to authenticated;
 
 -- -----------------------------------------------------------------------------
 -- Áreas
@@ -153,17 +266,22 @@ create table if not exists public.almoco_agenda (
 
 create index if not exists almoco_agenda_data_idx on public.almoco_agenda (data);
 
+-- Quem reservou. Nulo nas reservas de antes do cadastro e nas que o LMA faz
+-- em nome de alguém; o `nome` continua sendo o que aparece na grade.
+alter table public.almoco_agenda
+  add column if not exists membro_id uuid references public.membros(id) on delete set null;
+
 -- -----------------------------------------------------------------------------
 -- Lições com membros
 -- -----------------------------------------------------------------------------
 
 -- Sem constraint de unicidade, de propósito.
 --
--- O membro grava mas não lê esta tabela (tem telefone), então reenviar o
--- formulário é normal. Resolver ON CONFLICT exige permissão de leitura das
--- linhas em conflito, que o anônimo não tem: com a constraint, o reenvio
--- falhava com 42501. Linha repetida aqui é inofensiva e a leitura deduplica
--- por (nome, modalidade, dia, horário).
+-- O formulário do membro só acrescenta, e reenviar é normal. Com a
+-- constraint, o reenvio caía em ON CONFLICT, que exige ler as linhas em
+-- conflito — o anônimo de antes não podia, e o insert falhava com 42501.
+-- Linha repetida aqui é inofensiva e a leitura deduplica por (nome,
+-- modalidade, dia, horário).
 create table if not exists public.disponibilidade_licoes (
   id          uuid primary key default gen_random_uuid(),
   nome        text not null check (char_length(nome) between 2 and 120),
@@ -201,17 +319,21 @@ begin
   end if;
 end $$;
 
+alter table public.disponibilidade_licoes
+  add column if not exists membro_id uuid references public.membros(id) on delete set null;
+
 create index if not exists disponibilidade_busca_idx
   on public.disponibilidade_licoes (modalidade, dia, horario);
 
 create index if not exists disponibilidade_nome_idx
   on public.disponibilidade_licoes (lower(nome));
 
--- Teto por pessoa. Como a tabela não tem unicidade, reenviar o formulário
+-- Teto por membro. Como a tabela não tem unicidade, reenviar o formulário
 -- acrescenta linhas; sem limite, um laço de repetição encheria a tabela.
 -- 112 é o máximo que faz sentido (7 dias × 8 faixas × 2 modalidades), então
--- 500 dá folga para alguns reenvios e ainda limita.
-create or replace function public.disponibilidade_sob_limite(p_nome text)
+-- 500 dá folga para alguns reenvios e ainda limita. Conta pela conta, não
+-- pelo nome digitado, que antes bastava trocar para zerar o teto.
+create or replace function public.disponibilidade_sob_limite()
 returns boolean
 language sql
 stable
@@ -220,12 +342,12 @@ set search_path = public
 as $$
   select (
     select count(*) from public.disponibilidade_licoes
-    where lower(nome) = lower(coalesce(p_nome, ''))
+    where membro_id = auth.uid()
   ) < 500;
 $$;
 
-revoke all on function public.disponibilidade_sob_limite(text) from public;
-grant execute on function public.disponibilidade_sob_limite(text) to anon, authenticated;
+revoke all on function public.disponibilidade_sob_limite() from public;
+grant execute on function public.disponibilidade_sob_limite() to anon, authenticated;
 
 create table if not exists public.licoes_agenda (
   id          uuid primary key default gen_random_uuid(),
@@ -238,6 +360,9 @@ create table if not exists public.licoes_agenda (
   criado_em   timestamptz not null default now(),
   constraint licao_vaga_unica unique (data, horario, area_id)
 );
+
+alter table public.licoes_agenda
+  add column if not exists membro_id uuid references public.membros(id) on delete set null;
 
 -- -----------------------------------------------------------------------------
 -- Relatório de progresso
@@ -424,7 +549,20 @@ alter table public.plano_ala add column if not exists titulo text;
 -- Sem policy, nega. Cada tabela abaixo declara exatamente quem faz o quê.
 -- =============================================================================
 
+-- Permissões explícitas em TODAS as tabelas. A partir de 30 de outubro de
+-- 2026 o Supabase deixa de dar acesso automático pela API ao que for criado
+-- em `public`. No projeto de hoje as tabelas antigas já têm o seu; mas num
+-- projeto novo — o caso que o backup existe para cobrir — sem isto nenhuma
+-- tela abriria. Quem decide linha a linha continua sendo o RLS, abaixo.
+--
+-- O anônimo não precisa de tabela nenhuma: desde outubro de 2026 ninguém usa
+-- o app sem entrar.
+grant select, insert, update, delete on all tables in schema public to authenticated;
+revoke all on all tables in schema public from anon;
+
 alter table public.lideres               enable row level security;
+alter table public.membros               enable row level security;
+alter table public.senhas_provisorias    enable row level security;
 alter table public.areas                 enable row level security;
 alter table public.duplas_missionarios   enable row level security;
 alter table public.voluntarios_almoco    enable row level security;
@@ -451,7 +589,7 @@ begin
     select schemaname, tablename, policyname
     from pg_policies
     where schemaname = 'public'
-      and tablename in ('lideres','areas','duplas_missionarios','voluntarios_almoco','almoco_agenda',
+      and tablename in ('lideres','membros','senhas_provisorias','areas','duplas_missionarios','voluntarios_almoco','almoco_agenda',
                         'disponibilidade_licoes','licoes_agenda','relatorio_semanal',
                         'frequencia_ala','batismos','progredindo',
                         'caminho_pessoas','caminho_marcos','caminho_frequencia',
@@ -462,30 +600,45 @@ begin
   end loop;
 end $$;
 
--- --- lideres: líder enxerga a lista; só o dono mexe nela --------------------
---
--- As três policies de escrita exigem eh_dono() E `dono = false` na linha
--- tocada. Isso fecha o caminho de escalada: um líder comum não cria ninguém, e
--- nem o dono consegue criar um segundo dono pelo app nem se rebaixar sem
--- querer. Promover alguém a dono continua sendo uma linha de SQL, de propósito.
+-- O que o acesso antigo deixou para trás, já sem policy dependendo dele: o
+-- dono que concedia acesso pelo app, e o teto de disponibilidade contado
+-- pelo nome digitado.
+drop function if exists public.eh_dono();
+alter table public.lideres drop column if exists dono;
+drop function if exists public.disponibilidade_sob_limite(text);
+
+-- --- lideres: só o líder lê; ninguém escreve pelo app -----------------------
 create policy lideres_leitura on public.lideres
   for select using (public.eh_lider());
-create policy lideres_inclusao on public.lideres
-  for insert with check (public.eh_dono() and not dono);
-create policy lideres_ajuste on public.lideres
-  for update using (public.eh_dono() and not dono)
-  with check (public.eh_dono() and not dono);
-create policy lideres_remocao on public.lideres
-  for delete using (public.eh_dono() and not dono);
 
--- --- areas: leitura pública (o calendário precisa), escrita só do líder -------
+-- --- membros: cada um com o seu; o LMA vê todos -----------------------------
+-- O e-mail da linha é o da conta, conferido no token: ninguém cadastra o
+-- endereço de outra pessoa nem troca o seu por um que não é dele.
+create policy membros_leitura on public.membros
+  for select using (id = auth.uid() or public.eh_lider());
+create policy membros_cadastro on public.membros
+  for insert with check (
+    id = auth.uid() and email = lower(coalesce(auth.jwt() ->> 'email', ''))
+  );
+create policy membros_ajuste on public.membros
+  for update using (id = auth.uid())
+  with check (id = auth.uid() and email = lower(coalesce(auth.jwt() ->> 'email', '')));
+
+-- --- senha provisória: a conta vê a sua e dá baixa depois de trocar --------
+-- Quem cria a linha é redefinir_senha_de_membro() ou o SQL do fim do arquivo.
+create policy senha_provisoria_leitura on public.senhas_provisorias
+  for select using (id = auth.uid());
+create policy senha_provisoria_baixa on public.senhas_provisorias
+  for delete using (id = auth.uid());
+
+-- --- areas: quem usa o app lê (o calendário precisa), só o líder escreve ----
 create policy areas_leitura on public.areas
-  for select using (true);
+  for select using (public.pode_usar());
 create policy areas_escrita on public.areas
   for all using (public.eh_lider()) with check (public.eh_lider());
 
 create policy duplas_leitura on public.duplas_missionarios
-  for select using (true);
+  for select using (public.pode_usar());
 create policy duplas_escrita on public.duplas_missionarios
   for all using (public.eh_lider()) with check (public.eh_lider());
 
@@ -494,21 +647,27 @@ create policy voluntarios_tudo on public.voluntarios_almoco
   for all using (public.eh_lider()) with check (public.eh_lider());
 
 -- --- agenda do almoço: o coração do modelo de acesso --------------------------
--- Ler: qualquer pessoa com o link, para ver os dias livres.
+-- Ler: quem tem cadastro, para ver os dias livres. Era qualquer pessoa com o
+-- link até outubro de 2026.
 create policy almoco_leitura on public.almoco_agenda
-  for select using (true);
+  for select using (public.pode_usar());
 
--- Criar: qualquer pessoa com o link, de hoje até um ano à frente.
+-- Criar: o membro, em nome próprio, de hoje até um ano à frente.
 --
--- O teto não é decoração. Sem ele, qualquer um com o link podia gravar datas
--- arbitrariamente distantes — dez anos de calendário são ~14.600 linhas — e,
--- como anônimo não tem DELETE, só o LMA conseguiria limpar, uma a uma.
+-- O teto não é decoração. Sem ele, dez anos de calendário são ~14.600 linhas
+-- e, como o membro não apaga, só o LMA conseguiria limpar, uma a uma.
 --
--- O líder escapa das duas travas porque precisa acertar o passado.
+-- O líder escapa das travas porque precisa acertar o passado e reservar em
+-- nome de quem pediu por telefone.
 create policy almoco_reserva on public.almoco_agenda
   for insert with check (
     public.eh_lider()
-    or (data >= current_date and data <= current_date + interval '1 year')
+    or (
+      public.eh_membro()
+      and membro_id = auth.uid()
+      and nome = public.apelido_do_membro()
+      and data >= current_date and data <= current_date + interval '1 year'
+    )
   );
 
 -- Alterar e apagar: só o LMA. É o "uma vez gravada, só o admin altera".
@@ -518,29 +677,36 @@ create policy almoco_remocao on public.almoco_agenda
   for delete using (public.eh_lider());
 
 -- --- disponibilidade para lições ---------------------------------------------
--- Guarda telefone, então a leitura é do líder, como a lista de voluntários.
--- O membro cadastra a própria disponibilidade sem precisar ver a dos outros.
+-- Guarda telefone: o LMA lê tudo, o membro só o que é dele.
 create policy disp_leitura on public.disponibilidade_licoes
-  for select using (public.eh_lider());
--- Aceitava qualquer coisa. Agora o domínio vem das constraints da tabela e o
--- volume por pessoa vem daqui. Continua sendo possível a alguém com o link
--- cadastrar muitos nomes diferentes — isso é inerente ao modelo de link
--- aberto, e o que dá para limitar barato está limitado.
+  for select using (public.eh_lider() or membro_id = auth.uid());
 create policy disp_cadastro on public.disponibilidade_licoes
-  for insert with check (public.eh_lider() or public.disponibilidade_sob_limite(nome));
-
--- --- agenda das lições: pública como a do almoço ------------------------------
+  for insert with check (
+    public.eh_lider()
+    or (
+      public.eh_membro()
+      and membro_id = auth.uid()
+      and nome = public.apelido_do_membro()
+      and public.disponibilidade_sob_limite()
+    )
+  );
 create policy disp_ajuste on public.disponibilidade_licoes
   for update using (public.eh_lider()) with check (public.eh_lider());
 create policy disp_remocao on public.disponibilidade_licoes
   for delete using (public.eh_lider());
 
+-- --- agenda das lições: mesmas regras da do almoço ----------------------------
 create policy licoes_leitura on public.licoes_agenda
-  for select using (true);
+  for select using (public.pode_usar());
 create policy licoes_reserva on public.licoes_agenda
   for insert with check (
     public.eh_lider()
-    or (data >= current_date and data <= current_date + interval '1 year')
+    or (
+      public.eh_membro()
+      and membro_id = auth.uid()
+      and nome = public.apelido_do_membro()
+      and data >= current_date and data <= current_date + interval '1 year'
+    )
   );
 create policy licoes_ajuste on public.licoes_agenda
   for update using (public.eh_lider()) with check (public.eh_lider());
@@ -594,66 +760,98 @@ begin
 end $$;
 
 -- =============================================================================
--- ÚLTIMO PASSO — a conta de dono
+-- ÚLTIMO PASSO — contas de líder, limpeza e cadastro aberto, NESTA ORDEM
 --
--- Sem isto ninguém é líder, e as telas restritas ficam vazias para todos.
+-- 1) Crie as contas de líder ANTES de abrir o cadastro.
+--    Authentication -> Users -> Add user, marcando "Auto Confirm User":
 --
--- 1) Crie a conta no painel: Authentication -> Users -> Add user.
+--        lma@isudapp.netlify.app   senha inicial do LMA
+--        adm@isudapp.netlify.app   senha do ADM
 --
---        Email:    leoadm@isudapp.netlify.app
---        Password: a senha que você escolheu
---        Marque "Auto Confirm User".
+--    Enquanto "Confirm email" estiver LIGADO, ninguém de fora cria conta: o
+--    e-mail de confirmação não sai e o cadastro falha inteiro. Então ninguém
+--    registra esses endereços antes de você. Se o "Add user" responder que o
+--    endereço já existe, apague essa conta na mesma tela e crie de novo.
 --
---    Esse endereço NÃO é uma caixa de e-mail: ele existe só para o Supabase
---    Auth ter uma identidade, porque o Auth não conhece "usuário", só e-mail.
---    O app completa sozinho o que for digitado sem "@" com o domínio do site,
---    então no login basta escrever `LeoADM`. O domínio fica em
---    DOMINIO_USUARIO, em js/config.js; mudar lá invalida este login.
+--    Esses endereços NÃO são caixas de e-mail: existem só porque o Supabase
+--    Auth não conhece "usuário". O app completa o que for digitado sem "@"
+--    com o domínio do site, então no login basta escrever `LMA` ou `ADM`. O
+--    domínio fica em DOMINIO_USUARIO, em js/config.js.
 --
---    Consequência de o endereço não existir: "esqueci a senha" por e-mail não
---    funciona para esta conta. Trocar a senha é aqui no painel, na mesma tela
---    de Users.
+-- 2) Rode o BLOCO A, descomentado — uma vez só, antes de abrir o cadastro.
+--    Tira os acessos antigos: o LeoADM, os liberados por e-mail, e as contas
+--    que o login por link criou. Essas não têm senha; sobrando, ficariam
+--    presas: o cadastro diria "já existe", o login não entraria, e o LMA não
+--    teria cadastro onde gerar senha provisória. Contas não confirmadas saem
+--    junto — com a confirmação desligada, cadastrar-se com o e-mail de uma
+--    delas entregaria a sessão dela.
 --
--- 2) Rode as três linhas abaixo, descomentadas, com o MESMO e-mail do passo 1.
+-- 3) Rode o BLOCO B, descomentado, ANTES do primeiro login das contas. Liga
+--    LMA e ADM à lista de líderes pela conta e marca a senha inicial do LMA
+--    como provisória: no primeiro login o app pede outra. Pode rodar de novo
+--    (para ligar o ADM depois, por exemplo), mas só liga e só marca conta
+--    confirmada que NUNCA entrou — uma que já entrou pode ser de alguém que
+--    se cadastrou com o endereço, não sua. Entrou antes de ligar? Apague a
+--    conta no painel, crie de novo e rode o bloco B antes de entrar.
+--
+-- 4) Só então abra o cadastro: Authentication -> Sign In / Providers ->
+--    Email, DESLIGUE "Confirm email" e deixe "Allow new users to sign up"
+--    ligado. O servidor de e-mail embutido só entrega para quem é da equipe do
+--    projeto; com a confirmação ligada, o cadastro de qualquer membro falha
+--    ("Email address not authorized").
+--
+-- 5) Publique o site. Os calendários passam a exigir login assim que este
+--    arquivo roda, então o site antigo deixa de mostrá-los — rode e publique
+--    no mesmo momento.
 -- =============================================================================
 
--- insert into public.lideres (email, nome, dono)
--- values ('leoadm@isudapp.netlify.app', 'Dono', true)
--- on conflict (email) do update set dono = true;
+-- BLOCO A — uma vez só, antes de abrir o cadastro
+--
+-- delete from public.lideres
+-- where email not in ('lma@isudapp.netlify.app', 'adm@isudapp.netlify.app');
+--
+-- delete from auth.users
+-- where email not in ('lma@isudapp.netlify.app', 'adm@isudapp.netlify.app')
+--   and id not in (select id from public.membros);
+
+-- BLOCO B — pode repetir
+--
+-- insert into public.lideres (email, nome, usuario_id)
+-- select u.email, upper(split_part(u.email, '@', 1)), u.id
+-- from auth.users u
+-- where u.email in ('lma@isudapp.netlify.app', 'adm@isudapp.netlify.app')
+--   and u.last_sign_in_at is null and u.email_confirmed_at is not null
+-- on conflict (email) do update set usuario_id = excluded.usuario_id, nome = excluded.nome;
+--
+-- insert into public.senhas_provisorias (id)
+-- select id from auth.users
+-- where email = 'lma@isudapp.netlify.app'
+--   and last_sign_in_at is null and email_confirmed_at is not null
+-- on conflict (id) do nothing;
+
+-- Conferência: LMA e ADM devem aparecer, com usuario_id preenchido.
+-- select email, nome, usuario_id from public.lideres;
 
 -- =============================================================================
--- OS DEMAIS LMAs
+-- DEPOIS
 --
--- A linha em `lideres` é o que autoriza, e ela você cria pelo próprio app, em
--- Configurações -> Acesso. Falta só a pessoa ter como entrar, e há dois jeitos.
+-- Senha de líder: o LMA troca pelo próprio app (toque no nome, no topo).
+-- Esqueceu? O painel não define senha — só manda e-mail de recuperação, que
+-- não chega a lma@isudapp.netlify.app. Dê uma provisória por aqui (troque a
+-- senha e o e-mail) e o app pede outra no login:
 --
--- a) RECOMENDADO — conta com senha, criada por você:
---       Authentication -> Users -> Add user, com "Auto Confirm User" marcado.
---    Use `nome@isudapp.netlify.app` para ela entrar digitando só `nome`, ou o
---    e-mail real dela. Depois inclua a mesma conta na lista pelo app — para
---    `nome@isudapp.netlify.app`, basta digitar `nome`, como no login.
---    Não depende de e-mail chegando a lugar nenhum. Crie a conta ANTES de
---    incluir na lista: existindo no Auth, ninguém mais registra o endereço.
+-- update auth.users
+--    set encrypted_password = extensions.crypt('provisoria-123', extensions.gen_salt('bf', 10)),
+--        updated_at = now()
+--  where email = 'lma@isudapp.netlify.app';
+-- insert into public.senhas_provisorias (id)
+-- select id from auth.users where email = 'lma@isudapp.netlify.app'
+-- on conflict (id) do nothing;
 --
--- b) Por e-mail: a pessoa toca em "Logar como ADM" -> "Receber um link por
---    e-mail". O primeiro acesso cria a conta no Auth sozinho. Funciona, mas o
---    link conecta o aparelho que o ABRIR — pedir no computador e abrir no
---    celular loga o celular.
+-- Senha de membro esquecida: Configurações -> Membros -> "Senha provisória".
+-- O membro entra com ela e o app pede uma nova.
 --
--- O código de 6 dígitos resolveria (b), e o app já sabe pedi-lo: basta virar
--- CODIGO_POR_EMAIL para `true` em js/config.js. Só que ele depende de
--- {{ .Token }} no template "Magic link or OTP", e o plano free do Supabase
--- trava a edição de templates enquanto o projeto usar o servidor de e-mail
--- embutido ("Set up custom SMTP to edit templates"). Ligando um SMTP próprio
--- — Resend, Brevo e afins têm plano gratuito —, o template abre e o corpo
--- passa a ser:
---
---     <h2>Entrar no app da Obra Missionária</h2>
---     <p>Seu código de acesso é:</p>
---     <p style="font-size:28px;letter-spacing:6px"><b>{{ .Token }}</b></p>
---     <p>Ou <a href="{{ .ConfirmationURL }}">entre por este link</a> — mas
---        ele conecta o aparelho em que for aberto.</p>
---
--- SMTP próprio resolve outra coisa também: o servidor embutido do Supabase é
--- limitado a poucos e-mails por hora e é declaradamente não-produtivo.
+-- Líder novo: crie a conta no painel (ela nasce sem login), troque os
+-- e-mails no bloco B e rode ANTES de a pessoa entrar. Tirar o acesso:
+--   delete from public.lideres where email = '...';
 -- =============================================================================

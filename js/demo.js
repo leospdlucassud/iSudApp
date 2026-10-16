@@ -122,6 +122,18 @@ const ACOMPANHADOS_ANTIGOS = [
   { nome: 'Patrícia Moura', sexo: 'f', area: 'area2', tipo: 'retornando', diasAtras: 40, consentimento: false },
 ];
 
+/**
+ * Nome completo de quem aparece nas agendas como família. Os outros cadastros
+ * saem do próprio nome da agenda, sem o "Irmão"/"Irmã".
+ */
+const TITULARES = {
+  'Família Albuquerque': 'Paulo Albuquerque',
+  'Família Cardoso': 'Renata Cardoso',
+  'Família Esteves': 'Márcio Esteves',
+  'Família Guimarães': 'Sílvia Guimarães',
+  'Família Igarashi': 'Kenji Igarashi',
+};
+
 /** Antônio fica sem entrevista de acompanhamento: o alerta de mais de 30 dias. */
 const SEM_ENTREVISTA = 'Antônio Barbosa';
 
@@ -444,13 +456,28 @@ export function gerar() {
 
   L.plano_ala = SECOES_PLANO.map(s => ({ secao: s.key, texto: PLANO[s.key] ?? '' }));
 
-  /* --- Acesso ---------------------------------------------------------------- */
+  /* --- Membros cadastrados ------------------------------------------------- */
 
-  // example.com é o domínio reservado para exemplos: não chega a ninguém.
-  L.lideres = [
-    { email: 'lma@example.com', nome: 'Líder de missão (demonstração)', dono: true, criado_em: somaDias(HOJE, -200) + 'T12:00:00Z' },
-    { email: 'secretario@example.com', nome: 'Secretário da ala (demonstração)', dono: false, criado_em: somaDias(HOJE, -60) + 'T12:00:00Z' },
-  ];
+  // Quem aparece nas agendas tem cadastro, com o nome da agenda como "como
+  // quer ser chamado" — entrar como um deles mostra o app pelo lado do membro.
+  // example.com é o domínio reservado para exemplos: não chega a ninguém. Os
+  // telefones são os mesmos da lista de voluntários e da disponibilidade.
+  const semTratamento = (n) => n.replace(/^(Irmão|Irmã) /, '');
+  const paraEmail = (n) => n.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z]+/g, '.').replace(/^\.|\.$/g, '');
+  L.membros = [
+    ...VOLUNTARIOS.map((v, i) => ({ apelido: v.nome, telefone: tel(100 + i) })),
+    ...DISPONIVEIS.map(([nome], i) => ({ apelido: nome, telefone: tel(200 + i) })),
+  ].map((m, i) => {
+    const nome_completo = TITULARES[m.apelido] ?? semTratamento(m.apelido);
+    return {
+      ...m,
+      nome_completo,
+      email: `${paraEmail(nome_completo)}@example.com`,
+      whatsapp: i % 4 !== 3,
+      criado_em: somaDias(HOJE, -(80 - i * 3)) + 'T12:00:00Z',
+    };
+  });
 
   return L;
 }

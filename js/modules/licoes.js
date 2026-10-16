@@ -9,9 +9,12 @@
  *  2. Agenda datada — a lição de verdade, marcada num dia e horário, com a
  *     mesma trava do almoço para duas pessoas não pegarem o mesmo espaço.
  *
- * A disponibilidade guarda telefone, então o RLS deixa o membro GRAVAR mas
- * não LER. O formulário é de mão única de propósito: preencheu, some. Quem
- * enxerga a matriz completa é o LMA.
+ * A disponibilidade guarda telefone, então o membro só lê a dele, e o
+ * formulário continua de mão única: preencheu, some. Quem enxerga a matriz
+ * completa é o LMA.
+ *
+ * Nome e telefone saem do cadastro de quem está logado — o banco confere o
+ * nome. O LMA digita os dois, porque registra por quem pediu de viva voz.
  */
 
 import {
@@ -39,6 +42,8 @@ let modalidadeForm = 'presencial';
 let reciboMinha = null;
 let ano, mes;
 let areas = [], disponibilidade = [], agenda = [];
+/** Nome completo de cada cadastro, pelo id — só o LMA lê. */
+let cadastros = new Map();
 let desligarRealtime = null;
 
 export async function montar(alvo, contexto) {
@@ -94,21 +99,35 @@ export function impressao() {
   return { titulo: `Lições com os missionários — ${a.nome}`, detalhe: a.detalhe };
 }
 
+/**
+ * Quem é a pessoa de uma linha de disponibilidade. O cadastro, quando há:
+ * o nome do membro é o "como quer ser chamado", e dois cadastros podem ter o
+ * mesmo — duas "Irmã Maria" pelo nome viravam uma só, e o telefone de uma
+ * sumia. O nome fica para as linhas que o LMA digitou, que não têm cadastro.
+ */
+const pessoaDa = (d) => d.membro_id ?? `nome:${chave(d.nome)}`;
+
 async function recarregar() {
-  const [as, ds, ag] = await Promise.all([
+  const admin = ctx.db.ehAdmin();
+  const [as, ds, ag, ms] = await Promise.all([
     ctx.db.listar('areas'),
     ctx.db.listar(COL_DISP),
     ctx.db.listar(COL_AGENDA),
+    admin ? ctx.db.listar('membros').catch(() => []) : [],
   ]);
+  cadastros = new Map(ms.map(m => [m.id, m.nome_completo]));
   areas = (as.length ? as : AREAS_PADRAO).filter(a => a.ativa !== false);
   // A tabela não tem unicidade (ver supabase/schema.sql), então quem reenviou
   // o formulário aparece repetido. Fica com a linha mais recente de cada
-  // combinação, que é a que traz o telefone atualizado.
-  disponibilidade = [...new Map(
-    [...ds]
-      .sort((a, b) => String(a.criado_em ?? '').localeCompare(String(b.criado_em ?? '')))
-      .map(d => [`${chave(d.nome)}|${d.modalidade}|${d.dia}|${d.horario}`, d]),
-  ).values()];
+  // pessoa em cada horário — a que traz o telefone atualizado —, guardando
+  // os ids de todas, para "remover" tirar a pessoa do horário de uma vez (e
+  // não fazer a linha anterior reaparecer, como se a remoção tivesse falhado).
+  const porPessoaEHorario = new Map();
+  for (const d of [...ds].sort((a, b) => String(a.criado_em ?? '').localeCompare(String(b.criado_em ?? '')))) {
+    const k = `${pessoaDa(d)}|${d.modalidade}|${d.dia}|${d.horario}`;
+    porPessoaEHorario.set(k, { ...d, ids: [...(porPessoaEHorario.get(k)?.ids ?? []), d.id] });
+  }
+  disponibilidade = [...porPessoaEHorario.values()];
   agenda = ag;
 }
 
@@ -162,8 +181,10 @@ function seletorModalidade() {
 --------------------------------------------------------------------------- */
 
 function painelMinha() {
-  const nome = el('input', { class: 'input', autocomplete: 'name', placeholder: 'como a ala te conhece' });
-  const telefone = el('input', { class: 'input', type: 'tel', autocomplete: 'tel', placeholder: '63 90000-0000' });
+  const admin = ctx.db.ehAdmin();
+  const eu = ctx.db.meuCadastro();
+  const nome = admin && el('input', { class: 'input', autocomplete: 'off', placeholder: 'como a ala conhece a pessoa' });
+  const telefone = admin && el('input', { class: 'input', type: 'tel', autocomplete: 'off', placeholder: '63 90000-0000' });
 
   // Estado local da grade: Set de "modalidade|dia|horario".
   const marcados = new Set();
@@ -226,13 +247,14 @@ function painelMinha() {
 
   const enviar = el('button', { class: 'btn btn--primary', type: 'button' }, 'Enviar disponibilidade');
   enviar.addEventListener('click', async () => {
-    const n = nome.value.trim();
-    if (n.length < 2) return toast('Digite seu nome.', 'err');
+    const n = admin ? nome.value.trim() : eu?.apelido ?? '';
+    if (n.length < 2) return toast(admin ? 'Digite o nome.' : 'Seu cadastro está sem nome. Toque no seu nome, no topo.', 'err');
     if (!marcados.size) return toast('Marque ao menos um horário.', 'err');
+    const tel = admin ? telefone.value.trim() || null : eu.telefone;
 
     const registros = [...marcados].map(id => {
       const [modalidade, dia, horario] = id.split('|');
-      return { nome: n, telefone: telefone.value.trim() || null, modalidade, dia, horario };
+      return { nome: n, telefone: tel, modalidade, dia, horario, ...(admin ? {} : { membro_id: eu.id }) };
     });
 
     enviar.disabled = true;
@@ -254,11 +276,14 @@ function painelMinha() {
         contador,
       ),
       el('div', { class: 'card__body' },
-        el('div', { class: 'grid grid--2', style: 'margin-bottom:1rem' },
-          el('div', { class: 'field', style: 'margin:0' }, el('label', {}, 'Seu nome'), nome),
-          el('div', { class: 'field', style: 'margin:0' }, el('label', {}, 'Telefone'), telefone,
-            el('p', { class: 'field__hint' }, 'Só o líder de missão vê este número.')),
-        ),
+        admin
+          ? el('div', { class: 'grid grid--2', style: 'margin-bottom:1rem' },
+              el('div', { class: 'field', style: 'margin:0' }, el('label', {}, 'Nome do membro'), nome),
+              el('div', { class: 'field', style: 'margin:0' }, el('label', {}, 'Telefone'), telefone),
+            )
+          : el('p', { class: 'small muted', style: 'margin-bottom:1rem' },
+              'Enviando como ', el('strong', {}, eu?.apelido ?? '—'),
+              ', com o telefone do seu cadastro — que só o líder de missão vê.'),
         abasModalidade,
         areaGrade,
         el('p', { class: 'small muted', style: 'margin-top:.75rem' },
@@ -353,7 +378,7 @@ function painelSemana() {
       seletorModalidade(),
       el('span', { class: 'spacer' }),
       el('span', { class: 'small muted' },
-        `${new Set(daModalidade.map(d => chave(d.nome))).size} pessoa(s) nesta modalidade`),
+        `${new Set(daModalidade.map(pessoaDa)).size} pessoa(s) nesta modalidade`),
     ),
     el('div', { class: 'card' },
       el('div', { class: 'card__head' },
@@ -383,7 +408,7 @@ function painelSemana() {
 }
 
 function listarPessoas(dia, horario, pessoas) {
-  const porNome = [...new Map(pessoas.map(p => [chave(p.nome), p])).values()]
+  const porNome = [...new Map(pessoas.map(p => [pessoaDa(p), p])).values()]
     .sort((a, b) => comparaNome(a.nome, b.nome));
 
   return modal({
@@ -395,7 +420,8 @@ function listarPessoas(dia, horario, pessoas) {
         el('table', { class: 'table' },
           el('thead', {}, el('tr', {}, el('th', {}, 'Nome'), el('th', {}, 'Telefone'), el('th', {}, ''))),
           el('tbody', {}, ...porNome.map(p => el('tr', {},
-            el('td', {}, el('strong', {}, p.nome)),
+            el('td', {}, el('strong', {}, p.nome),
+              cadastros.has(p.membro_id) && el('div', { class: 'small muted' }, cadastros.get(p.membro_id))),
             el('td', { class: 'small' }, p.telefone || '—'),
             el('td', {}, el('button', {
               class: 'btn btn--icon btn--ghost', type: 'button',
@@ -403,7 +429,7 @@ function listarPessoas(dia, horario, pessoas) {
               onclick: async () => {
                 if (!await confirmar('Remover disponibilidade',
                   `Tirar ${p.nome} de ${dia.label}, ${horario}?`, { confirmar: 'Remover' })) return;
-                await ctx.db.remover(COL_DISP, p.id);
+                for (const id of p.ids ?? [p.id]) await ctx.db.remover(COL_DISP, id);
                 await recarregar();
                 pintar();
                 toast('Removido.');
@@ -505,14 +531,16 @@ function marcada(a) {
   return el('div', { class: 'row' },
     el('span', { class: 'badge badge--mute nowrap' }, a.horario),
     el('span', { class: 'dot', style: `background:${corDaArea(area?.cor ?? 0)}` }),
-    el('span', {}, `${m?.icone ?? ''} ${a.nome}`),
+    el('span', { title: cadastros.has(a.membro_id) ? `Marcada pelo cadastro de ${cadastros.get(a.membro_id)}` : null },
+      `${m?.icone ?? ''} ${a.nome}`),
     a.observacao && el('span', { class: 'small muted' }, `· ${a.observacao}`),
     ctx.db.ehAdmin() && el('button', {
       class: 'btn btn--icon btn--ghost', type: 'button',
       'aria-label': `Desmarcar ${a.nome} em ${dataCurta(a.data)}`,
       onclick: async () => {
         if (!await confirmar('Desmarcar lição',
-          `Remover ${a.nome} de ${dataCurta(a.data)}, ${a.horario}?`, { confirmar: 'Desmarcar' })) return;
+          `Remover ${a.nome}${cadastros.has(a.membro_id) ? ` (cadastro de ${cadastros.get(a.membro_id)})` : ''} ` +
+          `de ${dataCurta(a.data)}, ${a.horario}?`, { confirmar: 'Desmarcar' })) return;
         await ctx.db.remover(COL_AGENDA, a.id);
         await recarregar();
         pintar();
@@ -531,7 +559,9 @@ async function abrirAgendamento(d) {
     ...areas.map(a => el('option', { value: a.id }, a.nome)));
   const modalidade = el('select', { class: 'select' },
     ...MODALIDADES_LICAO.map(m => el('option', { value: m.key }, `${m.icone} ${m.label}`)));
-  const nome = el('input', { class: 'input', placeholder: 'quem vai acompanhar' });
+  const admin = ctx.db.ehAdmin();
+  const eu = ctx.db.meuCadastro();
+  const nome = admin && el('input', { class: 'input', placeholder: 'quem vai acompanhar' });
   const obs = el('input', { class: 'input', placeholder: 'opcional — quem será ensinado, endereço…' });
 
   // Só o LMA enxerga a disponibilidade, então só para ele dá para sugerir nomes.
@@ -557,7 +587,12 @@ async function abrirAgendamento(d) {
     el('div', { class: 'field' }, el('label', {}, 'Horário'), horario),
     el('div', { class: 'field' }, el('label', {}, 'Modalidade'), modalidade),
     el('div', { class: 'field' }, el('label', {}, 'Dupla / área'), area),
-    el('div', { class: 'field' }, el('label', {}, 'Membro que acompanha'), nome, sugestao),
+    admin
+      ? el('div', { class: 'field' }, el('label', {}, 'Membro que acompanha'), nome, sugestao)
+      : el('div', { class: 'field' },
+          el('label', {}, 'Membro que acompanha'),
+          el('p', { class: 'reserva__quem' }, eu?.apelido ?? '—'),
+          el('p', { class: 'field__hint' }, 'Você, pelo seu cadastro.')),
     el('div', { class: 'field' }, el('label', {}, 'Observação'), obs),
   );
 
@@ -566,8 +601,8 @@ async function abrirAgendamento(d) {
     corpo,
     confirmar: 'Marcar',
     aoConfirmar: async () => {
-      const v = nome.value.trim();
-      if (v.length < 2) throw new Error('Informe quem vai acompanhar.');
+      const v = admin ? nome.value.trim() : eu?.apelido ?? '';
+      if (v.length < 2) throw new Error(admin ? 'Informe quem vai acompanhar.' : 'Seu cadastro está sem nome. Toque no seu nome, no topo.');
 
       try {
         await ctx.db.reservar(COL_AGENDA, {
@@ -577,6 +612,7 @@ async function abrirAgendamento(d) {
           nome: v,
           modalidade: modalidade.value,
           observacao: obs.value.trim() || null,
+          ...(admin ? {} : { membro_id: eu.id }),
         });
       } catch (err) {
         if (err instanceof ConflitoError) {

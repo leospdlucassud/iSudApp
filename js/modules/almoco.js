@@ -6,6 +6,10 @@
  * presencial: o app não pergunta mais como o almoço será fornecido.
  *
  * Depois de gravado, o membro não altera a própria escolha: só o LMA.
+ *
+ * O membro reserva sempre em nome do próprio cadastro — o banco confere que o
+ * nome da reserva é o "como quer ser chamado" de quem está logado. O LMA
+ * digita o nome, porque reserva por quem pediu por telefone.
  */
 
 import { AREAS_PADRAO, MARCAS_SEMANA, MESES, PERIODICIDADES, corDaArea } from '../config.js';
@@ -20,6 +24,8 @@ let ctx, raiz;
 let aba = 'calendario';
 let ano, mes;
 let areas = [], agenda = [], voluntarios = [];
+/** Nome completo de cada cadastro, pelo id — só o LMA lê. */
+let cadastros = new Map();
 /** Busca da lista de voluntários. No módulo, e não no painel, para o papel saber dela. */
 let buscaVol = '';
 let desligarRealtime = null;
@@ -75,14 +81,17 @@ export function impressao() {
 }
 
 async function recarregar() {
-  const [as, ag, vs] = await Promise.all([
+  const admin = ctx.db.ehAdmin();
+  const [as, ag, vs, ms] = await Promise.all([
     ctx.db.listar('areas'),
     ctx.db.listar(COL_AGENDA),
-    ctx.db.listar(COL_VOL),
+    admin ? ctx.db.listar(COL_VOL) : [],
+    admin ? ctx.db.listar('membros').catch(() => []) : [],
   ]);
   areas = (as.length ? as : AREAS_PADRAO).filter(a => a.ativa !== false);
   agenda = ag;
   voluntarios = vs.sort((a, b) => comparaNome(a.nome, b.nome));
+  cadastros = new Map(ms.map(m => [m.id, m.nome_completo]));
 }
 
 /* ---------------------------------------------------------------------------
@@ -97,7 +106,7 @@ function pintar() {
   raiz.replaceChildren(
     el('div', { class: 'page-head' },
       el('h2', {}, '🍽️ Almoço dos missionários'),
-      el('p', {}, 'Escolha um dia livre e coloque seu nome. Depois de gravado, só o LMA altera.'),
+      el('p', {}, 'Escolha um dia livre para receber os missionários. Depois de gravado, só o LMA altera.'),
     ),
     el('div', { class: 'row row--wrap', style: 'margin-bottom:1rem' },
       el('div', { class: 'chips' },
@@ -177,8 +186,11 @@ function celula(d, area, marca, passado) {
     // Só nome. O ícone distinguia presencial, quentinha e Pix; desde outubro
     // de 2026 todo almoço é presencial, e um ícone igual em toda célula não
     // diz nada.
+    // O nome na grade é o "como quer ser chamado", que o membro pode trocar.
+    // O LMA vê de qual cadastro a reserva saiu.
+    const quem = cadastros.get(reserva.membro_id);
     td.append(el('div', { class: 'row' },
-      el('span', {}, reserva.nome),
+      el('span', { title: quem ? `Reservado pelo cadastro de ${quem}` : null }, reserva.nome),
       ctx.db.ehAdmin() && el('button', {
         class: 'btn btn--icon btn--ghost', type: 'button',
         'aria-label': `Liberar ${dataCurta(d.data)} — ${area.nome}`,
@@ -213,11 +225,13 @@ function mudarMes(passo) {
 --------------------------------------------------------------------------- */
 
 async function abrirReserva(d, area) {
-  const nome = el('input', {
+  const admin = ctx.db.ehAdmin();
+  const eu = ctx.db.meuCadastro();
+  const nome = admin && el('input', {
     class: 'input', list: 'lista-vol', autocomplete: 'off',
-    placeholder: 'Seu nome ou o do casal',
+    placeholder: 'Nome de quem vai oferecer',
   });
-  const datalist = el('datalist', { id: 'lista-vol' },
+  const datalist = admin && el('datalist', { id: 'lista-vol' },
     ...voluntarios.map(v => el('option', { value: v.nome })));
 
   const obs = el('input', { class: 'input', placeholder: 'opcional — horário, restrição alimentar…' });
@@ -228,8 +242,14 @@ async function abrirReserva(d, area) {
         el('div', {}, el('strong', {}, dataCurta(d.data)), ' · ', area.nome),
         el('div', { class: 'small muted' }, ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][d.dow]),
       )),
-    el('div', { class: 'field' }, el('label', {}, 'Nome'), nome, datalist,
-      el('p', { class: 'field__hint' }, 'Se você já está na lista, o nome aparece ao digitar.')),
+    admin
+      ? el('div', { class: 'field' }, el('label', {}, 'Nome'), nome, datalist,
+          el('p', { class: 'field__hint' }, 'Quem está na lista de voluntários aparece ao digitar.'))
+      : el('div', { class: 'field' },
+          el('label', {}, 'Em nome de'),
+          el('p', { class: 'reserva__quem' }, eu?.apelido ?? '—'),
+          el('p', { class: 'field__hint' },
+            'É o nome do seu cadastro. Para mudar, toque no seu nome, no topo da tela.')),
     el('div', { class: 'field' }, el('label', {}, 'Observação'), obs),
     el('p', { class: 'small muted' }, 'Depois de gravar, procure o LMA se precisar mudar.'),
   );
@@ -239,8 +259,8 @@ async function abrirReserva(d, area) {
     corpo,
     confirmar: 'Reservar',
     aoConfirmar: async () => {
-      const v = nome.value.trim();
-      if (v.length < 2) throw new Error('Digite seu nome.');
+      const v = admin ? nome.value.trim() : eu?.apelido ?? '';
+      if (v.length < 2) throw new Error(admin ? 'Digite o nome.' : 'Seu cadastro está sem nome. Toque no seu nome, no topo.');
 
       try {
         await ctx.db.reservar(COL_AGENDA, {
@@ -248,6 +268,8 @@ async function abrirReserva(d, area) {
           area_id: area.id,
           nome: v,
           observacao: obs.value.trim() || null,
+          // O banco exige, na reserva do membro, que ela seja dele mesmo.
+          ...(admin ? {} : { membro_id: eu.id }),
         });
       } catch (err) {
         if (err instanceof ConflitoError) {
@@ -268,7 +290,8 @@ async function abrirReserva(d, area) {
 async function liberar(reserva, d, area) {
   const ok = await confirmar(
     'Liberar a vaga',
-    `Remover ${reserva.nome} de ${dataCurta(d.data)} — ${area.nome}?`,
+    `Remover ${reserva.nome}${cadastros.has(reserva.membro_id) ? ` (cadastro de ${cadastros.get(reserva.membro_id)})` : ''} ` +
+    `de ${dataCurta(d.data)} — ${area.nome}?`,
     { confirmar: 'Liberar' },
   );
   if (!ok) return;

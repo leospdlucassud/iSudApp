@@ -1,7 +1,7 @@
 {
   "name": "Obra Missionária — Ala Palmas 4",
   "short_name": "Obra Missionária",
-  "description": "Ferramentas para o líder de missão da ala: relatório de progresso, calendário de almoço, disponibilidade para lições e acompanhamento no caminho do convênio.",
+  "description": "Ferramenta do membro para o apoio à Obra Missionária da Ala Palmas 4: calendário de almoço com os missionários e disponibilidade para lições.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
